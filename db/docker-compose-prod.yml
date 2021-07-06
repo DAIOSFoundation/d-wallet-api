@@ -1,0 +1,16 @@
+version: '3.8'
+services:
+  d-wallet-db-prod:
+    image: mongo:4.4.6-bionic
+    container_name: d-wallet-db-prod
+    restart: always
+    env_file: .env
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE}
+    volumes:
+      - ./mongo-init-prod.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+      - ./data-prod:/data/db
+    ports:
+      - '26002:27017'

@@ -1,0 +1,36 @@
+# Create stellar.toml in https://domain.com/.well-known/stellar.toml
+
+NETWORK_PASSPHRASE="Public Global EXAMPLE Network ; September 2020"
+FEDERATION_SERVER="https://example.com/federation"
+AUTH_SERVER="https://example.com/auth"
+TRANSFER_SERVER="https://example.com"
+SIGNING_KEY="GCOSDOXE5QTEDPPRRW5XI5WBY745W5EKWF64KCGD3CMPODBWUZA733T4"
+HORIZON_URL="https://horizon.domain.com"
+ACCOUNTS=[
+    "GA6NQUBMJARQHPNZ4YBJF3PXEX6YSRW7JOPTIWTGALVWASGSCHLRYLLZ"
+]
+VERSION="1.0.0"
+[DOCUMENTATION]
+ORG_NAME="Organization Name"
+ORG_DBA="Organization DBA"
+ORG_URL="https://example.com"
+ORG_LOGO="https://example.com/img/logo.png"
+ORG_DESCRIPTION="Team Example"
+ORG_PHYSICAL_ADDRESS="Seoul, Republic of Korea"
+ORG_PHYSICAL_ADDRESS_ATTESTATION="https://www.domain.com/address_attestation.jpg"
+ORG_PHONE_NUMBER="+82)02-4321-4321"
+ORG_PHONE_NUMBER_ATTESTATION="https://www.domain.com/phone_attestation.jpg"
+ORG_KEYBASE="Team EXAMPLE ACCOUNT"
+ORG_TWITTER="orgtweet"
+ORG_GITHUB="orgcode"
+ORG_OFFICIAL_EMAIL="developer@example.com"
+# asset with meta info
+[[CURRENCIES]]
+code="Example"
+issuer="GA6NQUBMJARQHPNZ4YBJF3PXEX6YSRW7JOPTIWTGALVWASGSCHLRYLLZ"
+display_decimals=2
+name="Example"
+desc="Example"
+conditions="There will only ever be 5,000,000,000 Example tokens in existence. We will distribute the revenue share annually on Jan. 15th"
+image="https://example.com/img/favicon.ico"
+fixed_number=10000
