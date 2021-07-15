@@ -4,6 +4,8 @@ const Web3 = require('web3');
 const Client = require('bitcoin-core');
 const TronWeb = require('tronweb');
 const ethers = require('ethers');
+const {create} = require('ipfs-http-client');
+const multer = require('multer');
 const cwr = require('../utils/createWebResp');
 const stellarConfig = require('../config/XLM/stellar');
 const eth = require('../config/ETH/eth');
@@ -260,6 +262,53 @@ const tronSendRawTransaction = async (req, res) => {
   }
 };
 
+/// /////////////////// Middleware for IPFS //////////////////////
+const ipfsNetwork = async (req, res, next) => {
+  try {
+    req.ipfs = create(process.env.NODE_ENDPOINT);
+    req.tmpDirectory = process.env.FILE_TEMP_DIRECTORY;
+    req.ipfsPath = process.env.IPFS_GLOBAL_PATH;
+    req.nodeFilePath = process.env.IFPS_NODE_PATH_FILE;
+    req.nodeMetaPath = process.env.IFPS_NODE_PATH_METADATA;
+    req.nodeBioPath = process.env.IFPS_NODE_PATH_BIO;
+    next();
+  } catch (e) {
+    return cwr.errorWebResp(res, 500, `E0000 - ipfsNetwork`, e.message);
+  }
+};
+
+const storage = multer.diskStorage({
+  destination(req, file, cb) {
+    cb(null, process.env.FILE_TEMP_DIRECTORY);
+  },
+  filename(req, file, cb) {
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    const fileName = file.originalname;
+    const fileIndex = fileName.lastIndexOf('.');
+    const fileType = fileName.substring(fileIndex + 1, fileName.length);
+    const uploadFileName = `${
+      `${file.fieldname}-${uniqueSuffix}` + '.'
+    }${fileType}`;
+    req.uploadFileName.push(uploadFileName);
+    req.fileType.push(fileType);
+    //req.files.push(file);
+    cb(null, uploadFileName);
+  },
+});
+
+const multerInitialize = async (req, res, next) => {
+  try {
+    req.uploadFileName = [];
+    req.fileType = [];
+    next();
+  } catch (e) {
+    return cwr.errorWebResp(res, 500, `E0000 - multerInitialize`, e.message);
+  }
+}
+
+
+const upload = multer({storage});
+
 module.exports = {
   isValidMnemonic,
   xlmNetwork,
@@ -274,4 +323,7 @@ module.exports = {
   btcLastBlockHash,
   tronNetwork,
   tronSendRawTransaction,
+  ipfsNetwork,
+  upload,
+  multerInitialize,
 };
