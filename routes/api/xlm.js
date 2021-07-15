@@ -108,4 +108,10 @@ router.post(
 // accountMerge
 router.post('/accountMerge', mw.xlmNetwork, xlmController.postAccountMerge);
 
+// minimumBalance
+router.get('/minimumBalance', mw.xlmNetwork, xlmController.getMinimumBalance);
+
+// Mint NFT
+router.post('/nft', mw.xlmNetwork, xlmController.postNFT);
+
 module.exports = router;

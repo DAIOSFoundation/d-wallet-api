@@ -34,12 +34,20 @@ const xlmNetwork = async (req, res, next) => {
       req.serverUrl = serverUrl;
       req.server = new StellarSdk.Server(serverUrl, {allowHttp: true});
       req.networkPassphrase = StellarSdk.Networks.TESTNET;
+      req.txOptions = {
+        fee: StellarSdk.BASE_FEE,
+        networkPassphrase: StellarSdk.Networks.TESTNET,
+      };
     } else if (network === 'PUBLIC') {
       // const serverUrl = 'https://horizon.stellar.org';
       const serverUrl = stellarConfig.publicUrl;
       req.serverUrl = serverUrl;
       req.server = new StellarSdk.Server(serverUrl, {allowHttp: true});
       req.networkPassphrase = StellarSdk.Networks.PUBLIC;
+      req.txOptions = {
+        fee: StellarSdk.BASE_FEE,
+        networkPassphrase: StellarSdk.Networks.PUBLIC,
+      };
     } else {
       return cwr.errorWebResp(res, 403, `E0000 - Invalid Network`);
     }
