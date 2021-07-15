@@ -51,6 +51,7 @@ const aaveRouter = require('./routes/api/aave');
 const tronRouter = require('./routes/api/tron');
 const atemRouter = require('./routes/api/atem');
 const orbsRouter = require('./routes/api/orbs');
+const didRouter = require('./routes/api/did');
 
 const app = express();
 
@@ -85,6 +86,7 @@ app.use(`${version}/aave`, aaveRouter);
 app.use(`${version}/tron`, tronRouter);
 app.use(`${version}/atem`, atemRouter);
 app.use(`${version}/orbs`, orbsRouter);
+app.use(`${version}/did`, didRouter);
 
 // Initial Syncing Service
 const {Syncing} = require('./utils/Syncing');
