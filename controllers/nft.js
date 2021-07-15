@@ -6,13 +6,13 @@ const postUploadMetadata = async (req, res) => {
     const {metadata, path} = req.body;
 
     const result = await req.ipfs.add(
-      {path: path + 'metadata.json', content: JSON.stringify(metadata)},
+      {path: `metadata.json`, content: JSON.stringify(metadata)},
       {wrapWithDirectory: true, pin: false, cidVersion: 1},
     );
 
     await req.ipfs.files.cp(
       req.ipfsPath + result.cid.toString(),
-      `/${result.cid.toString()}`,
+      `${path}${result.cid.toString()}`,
     );
     const fileHash = result.cid.toString();
     await req.ipfs.stop();
@@ -37,10 +37,10 @@ const postUploadFile = async (req, res) => {
         });
       });
 
-    const rawFile = await readFile(req.tmpDirectory + req.uploadFileName[req.files.length - 1]);
+    const rawFile = await readFile(req.tmpDirectory + req.uploadFileName[0]);
 
     const fileResult = await req.ipfs.add(
-      {path: req.files[req.files.length - 1].originalname, content: rawFile},
+      {path: req.file.originalname, content: rawFile},
       {wrapWithDirectory: true, pin: false, cidVersion: 1},
     );
 
@@ -51,19 +51,20 @@ const postUploadFile = async (req, res) => {
     const fileHash = fileResult.cid.toString();
 
     fs.access(
-      req.tmpDirectory + req.uploadFileName[req.files.length - 1],
+      req.tmpDirectory + req.uploadFileName[0],
       fs.constants.F_OK,
       (err) => {
         // A
         if (err) return console.log('삭제할 수 없는 파일입니다');
 
-        fs.unlink(req.tmpDirectory + req.uploadFileName[req.files.length - 1], (err) =>
-          err ? console.log(err)
+        fs.unlink(req.tmpDirectory + req.uploadFileName[0], (err) =>
+          err
+            ? console.log(err)
             : console.log(
-            `${
-              req.tmpDirectory + req.uploadFileName[req.files.length - 1]
-            } 를 정상적으로 삭제했습니다`,
-            ),
+                `${
+                  req.tmpDirectory + req.uploadFileName[0]
+                } 를 정상적으로 삭제했습니다`,
+              ),
         );
       },
     );
@@ -75,17 +76,18 @@ const postUploadFile = async (req, res) => {
     });
   } catch (e) {
     fs.access(
-      req.tmpDirectory + req.uploadFileName[req.files.length - 1],
+      req.tmpDirectory + req.uploadFileName[0],
       fs.constants.F_OK,
       (err) => {
         // A
         if (err) return console.log('삭제할 수 없는 파일입니다');
 
-        fs.unlink(req.tmpDirectory + req.uploadFileName[req.files.length - 1], (err) =>
-          err ? console.log(err)
+        fs.unlink(req.tmpDirectory + req.uploadFileName[0], (err) =>
+          err
+            ? console.log(err)
             : console.log(
-            `${`uploads/${req.uploadFileName[req.files.length - 1]}`} 를 정상적으로 삭제했습니다`,
-            ),
+                `${`uploads/${req.uploadFileName[0]}`} 를 정상적으로 삭제했습니다`,
+              ),
         );
       },
     );
@@ -103,10 +105,10 @@ const postUploadBio = async (req, res) => {
         });
       });
 
-    const rawFile = await readFile(req.tmpDirectory + req.uploadFileName[req.files.length - 1]);
+    const rawFile = await readFile(req.tmpDirectory + req.uploadFileName[0]);
 
     const fileResult = await req.ipfs.add(
-      {path: req.files[req.files.length - 1].originalname, content: rawFile},
+      {path: req.file.originalname, content: rawFile},
       {wrapWithDirectory: true, pin: false, cidVersion: 1},
     );
 
@@ -117,19 +119,20 @@ const postUploadBio = async (req, res) => {
     const fileHash = fileResult.cid.toString();
 
     fs.access(
-      req.tmpDirectory + req.uploadFileName[req.files.length - 1],
+      req.tmpDirectory + req.uploadFileName[0],
       fs.constants.F_OK,
       (err) => {
         // A
         if (err) return console.log('삭제할 수 없는 파일입니다');
 
-        fs.unlink(req.tmpDirectory + req.uploadFileName[req.files.length - 1], (err) =>
-          err ? console.log(err)
+        fs.unlink(req.tmpDirectory + req.uploadFileName[0], (err) =>
+          err
+            ? console.log(err)
             : console.log(
-            `${
-              req.tmpDirectory + req.uploadFileName[req.files.length - 1]
-            } 를 정상적으로 삭제했습니다`,
-            ),
+                `${
+                  req.tmpDirectory + req.uploadFileName[0]
+                } 를 정상적으로 삭제했습니다`,
+              ),
         );
       },
     );
@@ -141,17 +144,18 @@ const postUploadBio = async (req, res) => {
     });
   } catch (e) {
     fs.access(
-      req.tmpDirectory + req.uploadFileName[req.files.length - 1],
+      req.tmpDirectory + req.uploadFileName[0],
       fs.constants.F_OK,
       (err) => {
         // A
         if (err) return console.log('삭제할 수 없는 파일입니다');
 
-        fs.unlink(req.tmpDirectory + req.uploadFileName[req.files.length - 1], (err) =>
-          err ? console.log(err)
+        fs.unlink(req.tmpDirectory + req.uploadFileName[0], (err) =>
+          err
+            ? console.log(err)
             : console.log(
-            `${`uploads/${req.uploadFileName[req.files.length - 1]}`} 를 정상적으로 삭제했습니다`,
-            ),
+                `${`uploads/${req.uploadFileName[0]}`} 를 정상적으로 삭제했습니다`,
+              ),
         );
       },
     );
@@ -189,13 +193,12 @@ const postRemove = async (req, res) => {
     await ipfs.files.rm('/my/beautiful/directory', { recursive: true })
     */
     const result = await req.ipfs.files.stat(path);
-    if (result.type === "file") // file
-    {
+    if (result.type === 'file') {
+      // file
       await req.ipfs.files.rm(path);
-    }
-    else if (result.type === "directory") // folder
-    {
-      await req.ipfs.files.rm(path, { recursive: !!isRecursive });
+    } else if (result.type === 'directory') {
+      // folder
+      await req.ipfs.files.rm(path, {recursive: !!isRecursive});
     }
     await req.ipfs.stop();
     return cwr.createWebResp(res, 200, {result});
@@ -208,8 +211,7 @@ const postUploadFiles = async (req, res) => {
   try {
     const fileHash = [];
     const fileResult = [];
-    for(let i = 0 ; i < req.files.length; i++)
-    {
+    for (let i = 0; i < req.files.length; i++) {
       const readFile = (path) =>
         new Promise((resolve, reject) => {
           fs.readFile(path, (err, data) => {
@@ -220,10 +222,12 @@ const postUploadFiles = async (req, res) => {
 
       const rawFile = await readFile(req.tmpDirectory + req.uploadFileName[i]);
 
-      fileResult.push(await req.ipfs.add(
-        {path: req.files[i].originalname, content: rawFile},
-        {wrapWithDirectory: true, pin: false, cidVersion: 1},
-      ));
+      fileResult.push(
+        await req.ipfs.add(
+          {path: req.files[i].originalname, content: rawFile},
+          {wrapWithDirectory: true, pin: false, cidVersion: 1},
+        ),
+      );
 
       await req.ipfs.files.cp(
         req.ipfsPath + fileResult[i].cid.toString(),
@@ -239,12 +243,13 @@ const postUploadFiles = async (req, res) => {
           if (err) return console.log('삭제할 수 없는 파일입니다');
 
           fs.unlink(req.tmpDirectory + req.uploadFileName[i], (err) =>
-            err ? console.log(err)
+            err
+              ? console.log(err)
               : console.log(
-              `${
-                req.tmpDirectory + req.uploadFileName[i]
-              } 를 정상적으로 삭제했습니다`,
-              ),
+                  `${
+                    req.tmpDirectory + req.uploadFileName[i]
+                  } 를 정상적으로 삭제했습니다`,
+                ),
           );
         },
       );
@@ -255,8 +260,7 @@ const postUploadFiles = async (req, res) => {
       fileResult,
     });
   } catch (e) {
-    for(let i = 0 ; i < req.files.length; i++)
-    {
+    for (let i = 0; i < req.files.length; i++) {
       fs.access(
         req.tmpDirectory + req.uploadFileName[i],
         fs.constants.F_OK,
@@ -265,29 +269,40 @@ const postUploadFiles = async (req, res) => {
           if (err) return console.log('삭제할 수 없는 파일입니다');
 
           fs.unlink(req.tmpDirectory + req.uploadFileName[i], (err) =>
-            err ? console.log(err)
+            err
+              ? console.log(err)
               : console.log(
-              `${`uploads/${req.uploadFileName[i]}`} 를 정상적으로 삭제했습니다`,
-              ),
+                  `${`uploads/${req.uploadFileName[i]}`} 를 정상적으로 삭제했습니다`,
+                ),
           );
         },
       );
     }
 
-    return cwr.errorWebResp(res, 500, `E0000 - postUploadFiles`, e.message || e);
+    return cwr.errorWebResp(
+      res,
+      500,
+      `E0000 - postUploadFiles`,
+      e.message || e,
+    );
   }
 };
 
 const postMakeDirectory = async (req, res) => {
   try {
     const {path} = req.body;
-    await req.ipfs.files.mkdir(path, { parents: true, pin:false });
+    await req.ipfs.files.mkdir(path, {parents: true, pin: false});
     const result = await req.ipfs.files.stat(path);
     const folderHash = result.cid.toString();
     await req.ipfs.stop();
     return cwr.createWebResp(res, 200, {folderHash, result});
   } catch (e) {
-    return cwr.errorWebResp(res, 500, `E0000 - postMakeDirectory`, e.message || e);
+    return cwr.errorWebResp(
+      res,
+      500,
+      `E0000 - postMakeDirectory`,
+      e.message || e,
+    );
   }
 };
 
@@ -303,10 +318,10 @@ const postUploadFileAndMeta = async (req, res) => {
         });
       });
 
-    const rawFile = await readFile(req.tmpDirectory + req.uploadFileName[req.files.length - 1]);
+    const rawFile = await readFile(req.tmpDirectory + req.uploadFileName[0]);
 
     const fileResult = await req.ipfs.add(
-      {path: req.files[req.files.length - 1].originalname, content: rawFile},
+      {path: req.file.originalname, content: rawFile},
       {wrapWithDirectory: true, pin: false, cidVersion: 1},
     );
 
@@ -318,8 +333,8 @@ const postUploadFileAndMeta = async (req, res) => {
 
     const parseMetadata = JSON.parse(metadata);
     parseMetadata.NFT_IPFS_HASH = fileHash;
-    parseMetadata.fileType = req.fileType[req.files.length - 1];
-    parseMetadata.fileName = req.files[req.files.length - 1].originalname;
+    parseMetadata.fileType = req.fileType[0];
+    parseMetadata.fileName = req.file.originalname;
 
     const metaResult = await req.ipfs.add(
       {path: 'metadata.json', content: JSON.stringify(parseMetadata)},
@@ -333,14 +348,15 @@ const postUploadFileAndMeta = async (req, res) => {
     const metaHash = metaResult.cid.toString();
 
     fs.access(
-      req.tmpDirectory + req.uploadFileName[req.files.length - 1],
+      req.tmpDirectory + req.uploadFileName[0],
       fs.constants.F_OK,
       (err) => {
         // A
         if (err) return console.log('삭제할 수 없는 파일입니다');
 
-        fs.unlink(req.tmpDirectory + req.uploadFileName[req.files.length - 1], (err) =>
-          err ? console.log(err)
+        fs.unlink(req.tmpDirectory + req.uploadFileName[0], (err) =>
+          err
+            ? console.log(err)
             : console.log(
                 `${
                   req.tmpDirectory + req.uploadFileName
@@ -359,16 +375,17 @@ const postUploadFileAndMeta = async (req, res) => {
     });
   } catch (e) {
     fs.access(
-      req.tmpDirectory + req.uploadFileName[req.files.length - 1],
+      req.tmpDirectory + req.uploadFileName[0],
       fs.constants.F_OK,
       (err) => {
         // A
         if (err) return console.log('삭제할 수 없는 파일입니다');
 
-        fs.unlink(req.tmpDirectory + req.uploadFileName[req.files.length - 1], (err) =>
-          err ? console.log(err)
+        fs.unlink(req.tmpDirectory + req.uploadFileName[0], (err) =>
+          err
+            ? console.log(err)
             : console.log(
-                `${`uploads/${req.uploadFileName[req.files.length - 1]}`} 를 정상적으로 삭제했습니다`,
+                `${`uploads/${req.uploadFileName[0]}`} 를 정상적으로 삭제했습니다`,
               ),
         );
       },

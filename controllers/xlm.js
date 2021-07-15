@@ -3,6 +3,7 @@ const StellarHDWallet = require('stellar-hd-wallet');
 const axios = require('axios');
 const cwr = require('../utils/createWebResp');
 const xlmUtils = require('../utils/xlm/utils');
+const {ipfsUtils} = require('../utils/ipfs/ipfsUtils');
 
 const postKey = async (req, res) => {
   try {
@@ -119,7 +120,7 @@ const getAccountDetail = async (req, res) => {
 
 const postAccount = async (req, res) => {
   try {
-    const {server, networkPassphrase} = req;
+    const {server, txOptions} = req;
     const {
       toAddress,
       createFromSecret, // 초기잔액을 충천할 계정 비밀키
@@ -128,10 +129,6 @@ const postAccount = async (req, res) => {
       maxTime,
     } = req.body;
     const keypair = StellarSdk.Keypair.fromSecret(createFromSecret);
-    const txOptions = {
-      fee: StellarSdk.BASE_FEE,
-      networkPassphrase,
-    };
     const loadedAccount = await server.loadAccount(keypair.publicKey());
     const transaction = new StellarSdk.TransactionBuilder(
       loadedAccount,
@@ -162,11 +159,7 @@ const postAccount = async (req, res) => {
 const postPayment = async (req, res) => {
   try {
     const {toAddress, amount, memo, maxTime} = req.body;
-    const {asset, server} = req;
-    const txOptions = {
-      fee: StellarSdk.BASE_FEE,
-      networkPassphrase: req.networkPassphrase,
-    };
+    const {asset, server, txOptions} = req;
     const keypair = StellarSdk.Keypair.fromSecret(req.body.secretKey);
     const fromAddress = keypair.publicKey();
     const loadedAccount = await server.loadAccount(fromAddress);
@@ -199,12 +192,8 @@ const postPayment = async (req, res) => {
 
 const postTrustAsset = async (req, res) => {
   try {
-    const {asset, server} = req;
+    const {asset, server, txOptions} = req;
     const {maxTime} = req.body;
-    const txOptions = {
-      fee: StellarSdk.BASE_FEE,
-      networkPassphrase: req.networkPassphrase,
-    };
     const keypair = StellarSdk.Keypair.fromSecret(req.body.secretKey);
     const fromAddress = keypair.publicKey();
     const loadedAccount = await server.loadAccount(fromAddress);
@@ -230,12 +219,8 @@ const postTrustAsset = async (req, res) => {
 
 const postChangeTrustAsset = async (req, res) => {
   try {
-    const {asset, server} = req;
+    const {asset, server, txOptions} = req;
     const {maxTime, limit} = req.body;
-    const txOptions = {
-      fee: StellarSdk.BASE_FEE,
-      networkPassphrase: req.networkPassphrase,
-    };
     const keypair = StellarSdk.Keypair.fromSecret(req.body.secretKey);
     const fromAddress = keypair.publicKey();
     const loadedAccount = await server.loadAccount(fromAddress);
@@ -311,7 +296,7 @@ const getTxId = async (req, res) => {
 
 const postMultiSig = async (req, res) => {
   try {
-    const {server, networkPassphrase} = req;
+    const {server, txOptions} = req;
     const {accounts, maxTime} = req.body;
     const rootKeypair = StellarSdk.Keypair.fromSecret(accounts['0'].secretKey);
     const secondaryKeypair = StellarSdk.Keypair.fromSecret(
@@ -326,10 +311,6 @@ const postMultiSig = async (req, res) => {
       loadAccount.sequence,
     );
     const secondaryAddress = secondaryKeypair.publicKey();
-    const txOptions = {
-      fee: StellarSdk.BASE_FEE,
-      networkPassphrase,
-    };
     const transaction = new StellarSdk.TransactionBuilder(account, txOptions)
       .addOperation(
         StellarSdk.Operation.setOptions({
@@ -366,7 +347,7 @@ const postMultiSig = async (req, res) => {
 
 const postMultiSigPayment = async (req, res) => {
   try {
-    const {asset, server, networkPassphrase} = req;
+    const {asset, server, txOptions} = req;
     const {accounts, toAddress, amount, memo, maxTime} = req.body;
     const rootKeypair = StellarSdk.Keypair.fromSecret(accounts['0'].secretKey);
     const secondaryKeypair = StellarSdk.Keypair.fromSecret(
@@ -376,10 +357,6 @@ const postMultiSigPayment = async (req, res) => {
       rootKeypair.publicKey(),
       rootKeypair.sequence,
     );
-    const txOptions = {
-      fee: StellarSdk.BASE_FEE,
-      networkPassphrase,
-    };
     const transaction = new StellarSdk.TransactionBuilder(
       loadedAccount,
       txOptions,
@@ -412,12 +389,8 @@ const postMultiSigPayment = async (req, res) => {
 
 const postManageData = async (req, res) => {
   try {
-    const {server, networkPassphrase} = req;
+    const {server, txOptions} = req;
     const {secretKey, dataKey, dataValue, memo, maxTime} = req.body;
-    const txOptions = {
-      fee: StellarSdk.BASE_FEE,
-      networkPassphrase: req.networkPassphrase,
-    };
     const keypair = StellarSdk.Keypair.fromSecret(secretKey);
     const fromAddress = keypair.publicKey();
     const loadedAccount = await server.loadAccount(fromAddress);
@@ -479,12 +452,8 @@ const postDecodeEnvelopeXDR = async (req, res) => {
 
 const postAccountMerge = async (req, res) => {
   try {
-    const {server} = req;
+    const {server, txOptions} = req;
     const {secretKey, destination} = req.body;
-    const txOptions = {
-      fee: StellarSdk.BASE_FEE,
-      networkPassphrase: req.networkPassphrase,
-    };
     const keypair = StellarSdk.Keypair.fromSecret(secretKey);
     const fromAddress = keypair.publicKey();
     const loadedAccount = await server.loadAccount(fromAddress);
@@ -514,6 +483,134 @@ const postAccountMerge = async (req, res) => {
   }
 };
 
+const getMinimumBalance = async (req, res) => {
+  try {
+    const {address} = req.query;
+    const {server} = req;
+    const accountDetail = await server.loadAccount(address);
+    const subEntryCount = accountDetail.subentry_count;
+    const numSponsoring = accountDetail.num_sponsoring;
+    const numSponsored = accountDetail.num_sponsored;
+    const minimumBalance =
+      (2 + subEntryCount + numSponsoring - numSponsored) * 0.5;
+    const expression = `(2 + subEntryCount + numSponsoring - numSponsored) * 0.5`;
+    return cwr.createWebResp(res, 200, {
+      minimumBalance,
+      subEntryCount,
+      numSponsoring,
+      numSponsored,
+      expression,
+    });
+  } catch (e) {
+    return cwr.errorWebResp(
+      res,
+      500,
+      `E0000 - getMinimumBalance`,
+      xlmUtils.parseOperationError(e),
+    );
+  }
+};
+
+const postNFT = async (req, res) => {
+  try {
+    const {server, txOptions} = req;
+    const {nftReceiverSecret, sponsorSecret, nftName, nftAmount, ipfsHash} =
+      req.body;
+    if (!ipfsUtils.validator(ipfsHash)) {
+      return cwr.errorWebResp(
+        res,
+        403,
+        `E0000 - ipfsHash must start with 'Qm' or 'ba'`,
+      );
+    }
+    // Accounts
+    const sponsorAccount = StellarSdk.Keypair.fromSecret(sponsorSecret);
+    const nftReceiverAccount = StellarSdk.Keypair.fromSecret(nftReceiverSecret);
+    const nftIssuerAccount = StellarSdk.Keypair.random(); // Random account for 'NFT Issuer'
+
+    const loadedSponsorAccount = await server.loadAccount(
+      sponsorAccount.publicKey(),
+    );
+    const asset = new StellarSdk.Asset(nftName, nftIssuerAccount.publicKey());
+
+    const transaction = new StellarSdk.TransactionBuilder(
+      loadedSponsorAccount,
+      txOptions,
+    )
+      .addOperation(
+        StellarSdk.Operation.beginSponsoringFutureReserves({
+          source: sponsorAccount.publicKey(), // reserve Sponsor
+          sponsoredId: nftReceiverAccount.publicKey(), // receive Sponsor
+        }),
+      )
+      .addOperation(
+        StellarSdk.Operation.beginSponsoringFutureReserves({
+          source: sponsorAccount.publicKey(), // reserve Sponsor
+          sponsoredId: nftIssuerAccount.publicKey(), // receive Sponsor
+        }),
+      )
+      .addOperation(
+        StellarSdk.Operation.createAccount({
+          destination: nftIssuerAccount.publicKey(),
+          startingBalance: '0',
+        }),
+      )
+      // ChangeTrust NFT
+      .addOperation(
+        StellarSdk.Operation.changeTrust({
+          source: nftReceiverAccount.publicKey(),
+          asset,
+          limit: nftAmount,
+        }),
+      )
+      // Send NFT
+      .addOperation(
+        StellarSdk.Operation.payment({
+          source: nftIssuerAccount.publicKey(),
+          destination: nftReceiverAccount.publicKey(),
+          asset,
+          amount: nftAmount,
+        }),
+      )
+      // Set IPFS Information with ManageData
+      .addOperation(
+        StellarSdk.Operation.manageData({
+          source: nftIssuerAccount.publicKey(),
+          name: 'ipfshash',
+          value: ipfsHash,
+        }),
+      )
+      .addOperation(
+        StellarSdk.Operation.setOptions({
+          source: nftIssuerAccount.publicKey(),
+          masterWeight: 0,
+        }),
+      )
+      .addOperation(
+        StellarSdk.Operation.endSponsoringFutureReserves({
+          source: nftReceiverAccount.publicKey(),
+        }),
+      )
+      .addOperation(
+        StellarSdk.Operation.endSponsoringFutureReserves({
+          source: nftIssuerAccount.publicKey(),
+        }),
+      )
+      .setTimeout(180)
+      .build();
+    transaction.sign(sponsorAccount, nftReceiverAccount, nftIssuerAccount);
+    const txResponse = await server.submitTransaction(transaction);
+    return cwr.createWebResp(res, 200, txResponse);
+  } catch (e) {
+    return cwr.errorWebResp(
+      res,
+      500,
+      `E0000 - postNFT`,
+      xlmUtils.parseOperationError(e),
+    );
+  }
+};
+
 module.exports = {
   postKey,
   getFeeStats,
@@ -534,4 +631,6 @@ module.exports = {
   postManageData,
   postDecodeEnvelopeXDR,
   postAccountMerge,
+  getMinimumBalance,
+  postNFT,
 };

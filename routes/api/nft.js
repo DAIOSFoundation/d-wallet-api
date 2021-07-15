@@ -42,22 +42,10 @@ router.post(
   nftController.postUploadBio,
 );
 
-router.post(
-  '/makeDirectory',
-  mw.ipfsNetwork,
-  nftController.postMakeDirectory,
-);
+router.post('/makeDirectory', mw.ipfsNetwork, nftController.postMakeDirectory);
 
-router.post(
-  '/moveFile',
-  mw.ipfsNetwork,
-  nftController.postMoveFile,
-);
+router.post('/moveFile', mw.ipfsNetwork, nftController.postMoveFile);
 
-router.post(
-  '/remove',
-  mw.ipfsNetwork,
-  nftController.postRemove,
-);
+router.post('/remove', mw.ipfsNetwork, nftController.postRemove);
 
 module.exports = router;
