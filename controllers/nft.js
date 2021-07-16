@@ -1,5 +1,6 @@
 const fs = require('fs');
 const cwr = require('../utils/createWebResp');
+const winston = require('./config/winston');
 
 const postUploadMetadata = async (req, res) => {
   try {
@@ -55,12 +56,12 @@ const postUploadFile = async (req, res) => {
       fs.constants.F_OK,
       (err) => {
         // A
-        if (err) return console.log('삭제할 수 없는 파일입니다');
+        if (err) return winston.log.error('삭제할 수 없는 파일입니다', err);
 
         fs.unlink(req.tmpDirectory + req.uploadFileName[0], (err) =>
           err
-            ? console.log(err)
-            : console.log(
+            ? winston.log.error(err)
+            : winston.log.info(
                 `${
                   req.tmpDirectory + req.uploadFileName[0]
                 } 를 정상적으로 삭제했습니다`,
@@ -80,12 +81,12 @@ const postUploadFile = async (req, res) => {
       fs.constants.F_OK,
       (err) => {
         // A
-        if (err) return console.log('삭제할 수 없는 파일입니다');
+        if (err) return winston.log.error('삭제할 수 없는 파일입니다', err);
 
         fs.unlink(req.tmpDirectory + req.uploadFileName[0], (err) =>
           err
-            ? console.log(err)
-            : console.log(
+            ? winston.log.error(err)
+            : winston.log.info(
                 `${`uploads/${req.uploadFileName[0]}`} 를 정상적으로 삭제했습니다`,
               ),
         );
@@ -123,12 +124,12 @@ const postUploadBio = async (req, res) => {
       fs.constants.F_OK,
       (err) => {
         // A
-        if (err) return console.log('삭제할 수 없는 파일입니다');
+        if (err) return winston.log.error('삭제할 수 없는 파일입니다', err);
 
         fs.unlink(req.tmpDirectory + req.uploadFileName[0], (err) =>
           err
-            ? console.log(err)
-            : console.log(
+            ? winston.log.error(err)
+            : winston.log.info(
                 `${
                   req.tmpDirectory + req.uploadFileName[0]
                 } 를 정상적으로 삭제했습니다`,
@@ -148,12 +149,12 @@ const postUploadBio = async (req, res) => {
       fs.constants.F_OK,
       (err) => {
         // A
-        if (err) return console.log('삭제할 수 없는 파일입니다');
+        if (err) return winston.log.error('삭제할 수 없는 파일입니다', err);
 
         fs.unlink(req.tmpDirectory + req.uploadFileName[0], (err) =>
           err
-            ? console.log(err)
-            : console.log(
+            ? winston.log.error(err)
+            : winston.log.info(
                 `${`uploads/${req.uploadFileName[0]}`} 를 정상적으로 삭제했습니다`,
               ),
         );
@@ -240,12 +241,12 @@ const postUploadFiles = async (req, res) => {
         fs.constants.F_OK,
         (err) => {
           // A
-          if (err) return console.log('삭제할 수 없는 파일입니다');
+          if (err) return winston.log.error('삭제할 수 없는 파일입니다', err);
 
           fs.unlink(req.tmpDirectory + req.uploadFileName[i], (err) =>
             err
-              ? console.log(err)
-              : console.log(
+              ? winston.log.error(err)
+              : winston.log.info(
                   `${
                     req.tmpDirectory + req.uploadFileName[i]
                   } 를 정상적으로 삭제했습니다`,
@@ -266,12 +267,12 @@ const postUploadFiles = async (req, res) => {
         fs.constants.F_OK,
         (err) => {
           // A
-          if (err) return console.log('삭제할 수 없는 파일입니다');
+          if (err) return winston.log.error('삭제할 수 없는 파일입니다', err);
 
           fs.unlink(req.tmpDirectory + req.uploadFileName[i], (err) =>
             err
-              ? console.log(err)
-              : console.log(
+              ? winston.log.error(err)
+              : winston.log.info(
                   `${`uploads/${req.uploadFileName[i]}`} 를 정상적으로 삭제했습니다`,
                 ),
           );
@@ -352,12 +353,12 @@ const postUploadFileAndMeta = async (req, res) => {
       fs.constants.F_OK,
       (err) => {
         // A
-        if (err) return console.log('삭제할 수 없는 파일입니다');
+        if (err) return winston.log.error('삭제할 수 없는 파일입니다', err);
 
         fs.unlink(req.tmpDirectory + req.uploadFileName[0], (err) =>
           err
-            ? console.log(err)
-            : console.log(
+            ? winston.log.error(err)
+            : winston.log.info(
                 `${
                   req.tmpDirectory + req.uploadFileName
                 } 를 정상적으로 삭제했습니다`,
@@ -379,12 +380,12 @@ const postUploadFileAndMeta = async (req, res) => {
       fs.constants.F_OK,
       (err) => {
         // A
-        if (err) return console.log('삭제할 수 없는 파일입니다');
+        if (err) return winston.log.error('삭제할 수 없는 파일입니다', err);
 
         fs.unlink(req.tmpDirectory + req.uploadFileName[0], (err) =>
           err
-            ? console.log(err)
-            : console.log(
+            ? winston.log.error(err)
+            : winston.log.info(
                 `${`uploads/${req.uploadFileName[0]}`} 를 정상적으로 삭제했습니다`,
               ),
         );
