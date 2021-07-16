@@ -23,7 +23,7 @@ router.post('/subscribe', mw.web3, ethController.postSubscribe);
 
 router.post('/generateMnemonic', ethController.postGenerateMnemonic);
 
-router.get('/validateMnemonic', ethController.getValidateMnemonic);
+router.post('/validateMnemonic', ethController.postValidateMnemonic);
 
 router.post('/decodeKeystore', ethController.postDecodeKeystore);
 
