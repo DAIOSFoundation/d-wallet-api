@@ -1,6 +1,6 @@
 const fs = require('fs');
 const cwr = require('../utils/createWebResp');
-const winston = require('./config/winston');
+const winston = require('../config/winston');
 
 const postUploadMetadata = async (req, res) => {
   try {
