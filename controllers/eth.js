@@ -200,9 +200,9 @@ const postGenerateMnemonic = async (req, res) => {
   }
 };
 
-const getValidateMnemonic = async (req, res) => {
+const postValidateMnemonic = async (req, res) => {
   try {
-    const {mnemonic} = req.query;
+    const {mnemonic} = req.body;
     const result = bip39.validateMnemonic(mnemonic);
     return cwr.createWebResp(res, 200, result);
   } catch (e) {
@@ -563,7 +563,7 @@ module.exports = {
   postSendToken,
   postSubscribe,
   postGenerateMnemonic,
-  getValidateMnemonic,
+  postValidateMnemonic,
   postDecodeKeystore,
   postPrivateKeyToKeystore,
   getGasPrice,
