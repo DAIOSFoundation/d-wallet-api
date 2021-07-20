@@ -1,6 +1,7 @@
 const StellarSdk = require('stellar-sdk');
 const cwr = require('../utils/createWebResp');
 const xlmUtils = require('../utils/xlm/utils');
+const winston = require('../config/winston');
 
 // 자산 발행 Reference
 // https://developers.stellar.org/docs/issuing-assets/how-to-issue-an-asset/
@@ -45,7 +46,7 @@ const postIssue = async (req, res) => {
         .build();
       transaction.sign(receivingKeys);
       const submitTransactionLog = await server.submitTransaction(transaction);
-      console.log(submitTransactionLog);
+      winston.log.info(submitTransactionLog);
     }
 
     // Second, the issuing account actually sends a payment using the asset

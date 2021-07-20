@@ -1,5 +1,6 @@
 const fetch = require('node-fetch');
 const cwr = require('../utils/createWebResp');
+const winston = require('../config/winston');
 
 const tronSendRawTransaction = async (req, res) => {
   try {
@@ -81,8 +82,8 @@ const getCheckNetworkStatus = async (req, res) => {
 
     const result = await fetch(url, options)
       .then((res) => res.json())
-      .then((json) => console.log(json))
-      .catch((err) => console.error(`error:${err}`));
+      .then((json) => winston.log.info(json))
+      .catch((err) => winston.log.error(`error:${err}`));
 
     return cwr.createWebResp(res, 200, true);
   } catch (e) {
@@ -209,8 +210,8 @@ const postWithdrawBalance = async (req, res) => {
   } catch (e) {
     const result = fetch(url, options)
       .then((res) => res.json())
-      .then((json) => console.log(json))
-      .catch((err) => console.error(`error:${err}`));
+      .then((json) => winston.log.info(json))
+      .catch((err) => winston.log.error(`error:${err}`));
     return cwr.createWebResp(res, 200, true);
   }
 };

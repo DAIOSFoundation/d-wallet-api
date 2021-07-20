@@ -10,6 +10,7 @@ const globalService = require('../services/global');
 const {StandardABI} = require('../config/ETH/StandardTokenABI');
 const cwr = require('../utils/createWebResp');
 const {SyncGetBlock} = require('../utils/eth/SyncGetBlock');
+const winston = require('../config/winston');
 
 const subscribe = {
   logs: undefined,
@@ -154,22 +155,22 @@ const postSubscribe = async (req, res) => {
           address,
         },
         function (error, result) {
-          if (!error) console.log(result);
+          if (!error) winston.log.info(result);
         },
       )
       .on('connected', function (subscriptionId) {
-        console.log('connected => ', subscriptionId);
+        winston.log.info('connected => ', subscriptionId);
       })
       .on('data', function (log) {
-        console.log('data => ', log);
+        winston.log.info('data => ', log);
       })
       .on('changed', function (log) {
-        console.log('changed => ', log);
+        winston.log.info('changed => ', log);
       });
     // unsubscribes the subscription
     // subscription.unsubscribe(function(error, success){
     //   if(success)
-    //     console.log('Successfully unsubscribed!');
+    //     winston.log.info('Successfully unsubscribed!');
     // });
     return cwr.createWebResp(res, 200, {success: true});
   } catch (e) {
@@ -522,10 +523,10 @@ const getSubscription = async (req, res) => {
           req.web3WS.eth.subscribe(type, async (error, result) => {
             if (!error) {
               // .on("data")와 같음.
-              console.log('[log]', req.endpoint, type, 'result:', result);
+              winston.log.info('[log]', req.endpoint, type, 'result:', result);
             } else {
               // .on("error")와 같음.
-              console.log('[log]', req.endpoint, type, 'error:', error);
+              winston.log.info('[log]', req.endpoint, type, 'error:', error);
             }
           });
         return cwr.createWebResp(res, 200, true);

@@ -1,22 +1,26 @@
-const fs = require('fs');
 const cwr = require('../utils/createWebResp');
+const winston = require('../config/winston');
+const {removeFile, readFile, isExist, addFileOnIPFS} = require('../services/nft');
 
 const postUploadMetadata = async (req, res) => {
   try {
     const {metadata, path} = req.body;
-
-    const result = await req.ipfs.add(
-      {path: `metadata.json`, content: JSON.stringify(metadata)},
-      {wrapWithDirectory: true, pin: false, cidVersion: 1},
+    if(!metadata)
+    {
+      return cwr.errorWebResp(
+          res,
+          500,
+          `E0000 - postUploadMetadata`,
+          "Nothing is uploaded.",
+      );
+    }
+    const {hash, result} = await addFileOnIPFS(
+      req,
+      `metadata.json`,
+      JSON.stringify(metadata),
+      path,
     );
-
-    await req.ipfs.files.cp(
-      req.ipfsPath + result.cid.toString(),
-      `${path}${result.cid.toString()}`,
-    );
-    const fileHash = result.cid.toString();
-    await req.ipfs.stop();
-    return cwr.createWebResp(res, 200, {fileHash, result});
+    return cwr.createWebResp(res, 200, {hash, result});
   } catch (e) {
     return cwr.errorWebResp(
       res,
@@ -29,136 +33,52 @@ const postUploadMetadata = async (req, res) => {
 
 const postUploadFile = async (req, res) => {
   try {
-    const readFile = (path) =>
-      new Promise((resolve, reject) => {
-        fs.readFile(path, (err, data) => {
-          if (err) reject(err);
-          else resolve(data);
-        });
-      });
-
+    if(!req.file)
+    {
+      return cwr.errorWebResp(
+          res,
+          500,
+          `E0000 - postUploadFile`,
+          "Nothing is uploaded.",
+      );
+    }
     const rawFile = await readFile(req.tmpDirectory + req.uploadFileName[0]);
-
-    const fileResult = await req.ipfs.add(
-      {path: req.file.originalname, content: rawFile},
-      {wrapWithDirectory: true, pin: false, cidVersion: 1},
+    const {hash, result} = await addFileOnIPFS(
+      req,
+      req.file.originalname,
+      rawFile,
+      req.nodeFilePath,
     );
-
-    await req.ipfs.files.cp(
-      req.ipfsPath + fileResult.cid.toString(),
-      req.nodeFilePath + fileResult.cid.toString(),
-    );
-    const fileHash = fileResult.cid.toString();
-
-    fs.access(
-      req.tmpDirectory + req.uploadFileName[0],
-      fs.constants.F_OK,
-      (err) => {
-        // A
-        if (err) return console.log('삭제할 수 없는 파일입니다');
-
-        fs.unlink(req.tmpDirectory + req.uploadFileName[0], (err) =>
-          err
-            ? console.log(err)
-            : console.log(
-                `${
-                  req.tmpDirectory + req.uploadFileName[0]
-                } 를 정상적으로 삭제했습니다`,
-              ),
-        );
-      },
-    );
-
-    await req.ipfs.stop();
-    return cwr.createWebResp(res, 200, {
-      fileHash,
-      fileResult,
-    });
+    removeFile(req.tmpDirectory, req.uploadFileName[0]);
+    return cwr.createWebResp(res, 200, {hash, result});
   } catch (e) {
-    fs.access(
-      req.tmpDirectory + req.uploadFileName[0],
-      fs.constants.F_OK,
-      (err) => {
-        // A
-        if (err) return console.log('삭제할 수 없는 파일입니다');
-
-        fs.unlink(req.tmpDirectory + req.uploadFileName[0], (err) =>
-          err
-            ? console.log(err)
-            : console.log(
-                `${`uploads/${req.uploadFileName[0]}`} 를 정상적으로 삭제했습니다`,
-              ),
-        );
-      },
-    );
+    removeFile(req.tmpDirectory, req.uploadFileName[0]);
     return cwr.errorWebResp(res, 500, `E0000 - postUploadFile`, e.message || e);
   }
 };
 
 const postUploadBio = async (req, res) => {
   try {
-    const readFile = (path) =>
-      new Promise((resolve, reject) => {
-        fs.readFile(path, (err, data) => {
-          if (err) reject(err);
-          else resolve(data);
-        });
-      });
-
+    if(!req.file)
+    {
+      return cwr.errorWebResp(
+          res,
+          500,
+          `E0000 - postUploadBio`,
+          "Nothing is uploaded.",
+      );
+    }
     const rawFile = await readFile(req.tmpDirectory + req.uploadFileName[0]);
-
-    const fileResult = await req.ipfs.add(
-      {path: req.file.originalname, content: rawFile},
-      {wrapWithDirectory: true, pin: false, cidVersion: 1},
+    const {hash, result} = await addFileOnIPFS(
+      req,
+      req.file.originalname,
+      rawFile,
+      req.nodeBioPath,
     );
-
-    await req.ipfs.files.cp(
-      req.ipfsPath + fileResult.cid.toString(),
-      req.nodeBioPath + fileResult.cid.toString(),
-    );
-    const fileHash = fileResult.cid.toString();
-
-    fs.access(
-      req.tmpDirectory + req.uploadFileName[0],
-      fs.constants.F_OK,
-      (err) => {
-        // A
-        if (err) return console.log('삭제할 수 없는 파일입니다');
-
-        fs.unlink(req.tmpDirectory + req.uploadFileName[0], (err) =>
-          err
-            ? console.log(err)
-            : console.log(
-                `${
-                  req.tmpDirectory + req.uploadFileName[0]
-                } 를 정상적으로 삭제했습니다`,
-              ),
-        );
-      },
-    );
-
-    await req.ipfs.stop();
-    return cwr.createWebResp(res, 200, {
-      fileHash,
-      fileResult,
-    });
+    removeFile(req.tmpDirectory, req.uploadFileName[0]);
+    return cwr.createWebResp(res, 200, {hash, result});
   } catch (e) {
-    fs.access(
-      req.tmpDirectory + req.uploadFileName[0],
-      fs.constants.F_OK,
-      (err) => {
-        // A
-        if (err) return console.log('삭제할 수 없는 파일입니다');
-
-        fs.unlink(req.tmpDirectory + req.uploadFileName[0], (err) =>
-          err
-            ? console.log(err)
-            : console.log(
-                `${`uploads/${req.uploadFileName[0]}`} 를 정상적으로 삭제했습니다`,
-              ),
-        );
-      },
-    );
+    removeFile(req.tmpDirectory, req.uploadFileName[0]);
     return cwr.errorWebResp(res, 500, `E0000 - postUploadBio`, e.message || e);
   }
 };
@@ -171,10 +91,13 @@ const postMoveFile = async (req, res) => {
     await ipfs.files.mv('/src-dir', '/dst-dir')
     await ipfs.files.mv(['/src-file1', '/src-file2'], '/dst-dir')
     */
+    if (!await isExist(req, from))
+    {
+      throw from + ' is not exist on IPFS';
+    }
     await req.ipfs.files.mv(from, to);
     const readTo = await req.ipfs.files.stat(to);
     const toHash = readTo.cid.toString();
-    await req.ipfs.stop();
     return cwr.createWebResp(res, 200, {toHash, readTo});
   } catch (e) {
     return cwr.errorWebResp(res, 500, `E0000 - postMoveFile`, e.message || e);
@@ -192,16 +115,18 @@ const postRemove = async (req, res) => {
     // To remove a directory
     await ipfs.files.rm('/my/beautiful/directory', { recursive: true })
     */
+    if (!await isExist(req, path))
+    {
+      throw path + ' is not exist on IPFS';
+    }
     const result = await req.ipfs.files.stat(path);
+    const hash = result.cid.toString();
     if (result.type === 'file') {
-      // file
       await req.ipfs.files.rm(path);
     } else if (result.type === 'directory') {
-      // folder
       await req.ipfs.files.rm(path, {recursive: !!isRecursive});
     }
-    await req.ipfs.stop();
-    return cwr.createWebResp(res, 200, {result});
+    return cwr.createWebResp(res, 200, {hash, result});
   } catch (e) {
     return cwr.errorWebResp(res, 500, `E0000 - postMoveFile`, e.message || e);
   }
@@ -211,74 +136,42 @@ const postUploadFiles = async (req, res) => {
   try {
     const fileHash = [];
     const fileResult = [];
-    for (let i = 0; i < req.files.length; i++) {
-      const readFile = (path) =>
-        new Promise((resolve, reject) => {
-          fs.readFile(path, (err, data) => {
-            if (err) reject(err);
-            else resolve(data);
-          });
-        });
-
-      const rawFile = await readFile(req.tmpDirectory + req.uploadFileName[i]);
-
-      fileResult.push(
-        await req.ipfs.add(
-          {path: req.files[i].originalname, content: rawFile},
-          {wrapWithDirectory: true, pin: false, cidVersion: 1},
-        ),
-      );
-
-      await req.ipfs.files.cp(
-        req.ipfsPath + fileResult[i].cid.toString(),
-        req.nodeFilePath + fileResult[i].cid.toString(),
-      );
-      fileHash.push(req.nodeFilePath + fileResult[i].cid.toString());
-
-      fs.access(
-        req.tmpDirectory + req.uploadFileName[i],
-        fs.constants.F_OK,
-        (err) => {
-          // A
-          if (err) return console.log('삭제할 수 없는 파일입니다');
-
-          fs.unlink(req.tmpDirectory + req.uploadFileName[i], (err) =>
-            err
-              ? console.log(err)
-              : console.log(
-                  `${
-                    req.tmpDirectory + req.uploadFileName[i]
-                  } 를 정상적으로 삭제했습니다`,
-                ),
-          );
-        },
+    if(!req.files)
+    {
+      return cwr.errorWebResp(
+          res,
+          500,
+          `E0000 - postUploadFiles`,
+          "Nothing is uploaded.",
       );
     }
-    await req.ipfs.stop();
+    for (let i = 0; i < req.files.length; i++) {
+      try {
+        const rawFile = await readFile(
+          req.tmpDirectory + req.uploadFileName[i],
+        );
+        const {hash, result} = await addFileOnIPFS(
+          req,
+          `metadata.json`,
+          rawFile,
+          req.nodeFilePath,
+        );
+        fileResult.push(result);
+        fileHash.push(hash);
+      } catch (e) {
+        winston.log.warn(e || e.message);
+      } finally {
+        removeFile(req.tmpDirectory, req.uploadFileName[i]);
+      }
+    }
     return cwr.createWebResp(res, 200, {
       fileHash,
       fileResult,
     });
   } catch (e) {
     for (let i = 0; i < req.files.length; i++) {
-      fs.access(
-        req.tmpDirectory + req.uploadFileName[i],
-        fs.constants.F_OK,
-        (err) => {
-          // A
-          if (err) return console.log('삭제할 수 없는 파일입니다');
-
-          fs.unlink(req.tmpDirectory + req.uploadFileName[i], (err) =>
-            err
-              ? console.log(err)
-              : console.log(
-                  `${`uploads/${req.uploadFileName[i]}`} 를 정상적으로 삭제했습니다`,
-                ),
-          );
-        },
-      );
+      removeFile(req.tmpDirectory, req.uploadFileName[i]);
     }
-
     return cwr.errorWebResp(
       res,
       500,
@@ -294,7 +187,6 @@ const postMakeDirectory = async (req, res) => {
     await req.ipfs.files.mkdir(path, {parents: true, pin: false});
     const result = await req.ipfs.files.stat(path);
     const folderHash = result.cid.toString();
-    await req.ipfs.stop();
     return cwr.createWebResp(res, 200, {folderHash, result});
   } catch (e) {
     return cwr.errorWebResp(
@@ -309,64 +201,39 @@ const postMakeDirectory = async (req, res) => {
 const postUploadFileAndMeta = async (req, res) => {
   try {
     const {metadata} = req.body;
-
-    const readFile = (path) =>
-      new Promise((resolve, reject) => {
-        fs.readFile(path, (err, data) => {
-          if (err) reject(err);
-          else resolve(data);
-        });
-      });
-
+    if(!req.file || !metadata)
+    {
+      return cwr.errorWebResp(
+          res,
+          500,
+          `E0000 - postUploadFileAndMeta`,
+          "Nothing is uploaded.",
+      );
+    }
     const rawFile = await readFile(req.tmpDirectory + req.uploadFileName[0]);
-
-    const fileResult = await req.ipfs.add(
-      {path: req.file.originalname, content: rawFile},
-      {wrapWithDirectory: true, pin: false, cidVersion: 1},
+    const fileAdd = await addFileOnIPFS(
+      req,
+      req.file.originalname,
+      rawFile,
+      req.nodeFilePath,
     );
-
-    await req.ipfs.files.cp(
-      req.ipfsPath + fileResult.cid.toString(),
-      req.nodeFilePath + fileResult.cid.toString(),
-    );
-    const fileHash = fileResult.cid.toString();
+    const fileResult = fileAdd.result,
+      fileHash = fileAdd.hash;
 
     const parseMetadata = JSON.parse(metadata);
     parseMetadata.NFT_IPFS_HASH = fileHash;
     parseMetadata.fileType = req.fileType[0];
     parseMetadata.fileName = req.file.originalname;
-
-    const metaResult = await req.ipfs.add(
-      {path: 'metadata.json', content: JSON.stringify(parseMetadata)},
-      {wrapWithDirectory: true, pin: false, cidVersion: 1},
+    const metaAdd = await addFileOnIPFS(
+      req,
+      'metadata.json',
+      JSON.stringify(parseMetadata),
+      req.nodeMetaPath,
     );
+    const metaResult = metaAdd.result,
+      metaHash = metaAdd.hash;
 
-    await req.ipfs.files.cp(
-      req.ipfsPath + metaResult.cid.toString(),
-      req.nodeMetaPath + metaResult.cid.toString(),
-    );
-    const metaHash = metaResult.cid.toString();
-
-    fs.access(
-      req.tmpDirectory + req.uploadFileName[0],
-      fs.constants.F_OK,
-      (err) => {
-        // A
-        if (err) return console.log('삭제할 수 없는 파일입니다');
-
-        fs.unlink(req.tmpDirectory + req.uploadFileName[0], (err) =>
-          err
-            ? console.log(err)
-            : console.log(
-                `${
-                  req.tmpDirectory + req.uploadFileName
-                } 를 정상적으로 삭제했습니다`,
-              ),
-        );
-      },
-    );
-
-    await req.ipfs.stop();
+    removeFile(req.tmpDirectory, req.uploadFileName[0]);
     return cwr.createWebResp(res, 200, {
       fileHash,
       metaHash,
@@ -374,22 +241,7 @@ const postUploadFileAndMeta = async (req, res) => {
       metaResult,
     });
   } catch (e) {
-    fs.access(
-      req.tmpDirectory + req.uploadFileName[0],
-      fs.constants.F_OK,
-      (err) => {
-        // A
-        if (err) return console.log('삭제할 수 없는 파일입니다');
-
-        fs.unlink(req.tmpDirectory + req.uploadFileName[0], (err) =>
-          err
-            ? console.log(err)
-            : console.log(
-                `${`uploads/${req.uploadFileName[0]}`} 를 정상적으로 삭제했습니다`,
-              ),
-        );
-      },
-    );
+    removeFile(req.tmpDirectory, req.uploadFileName[0]);
     return cwr.errorWebResp(
       res,
       500,
