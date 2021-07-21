@@ -43,16 +43,14 @@ const addFileOnIPFS = async (req, name, file, path) => {
       {path: name, content: file},
       {wrapWithDirectory: true, pin: false, cidVersion: 1},
     );
-
+    const hash = result.cid.toString();
     if (await isExist(req, path + result.cid.toString())) {
-      throw `already exist file on ${path}${result.cid.toString()}`;
+      return {hash, result};
     }
-
     await req.ipfs.files.cp(
       req.ipfsPath + result.cid.toString(),
       path + result.cid.toString(),
     );
-    const hash = result.cid.toString();
     return {hash, result};
   } catch (e) {
     throw e;
