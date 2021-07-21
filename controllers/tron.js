@@ -1,4 +1,5 @@
 const fetch = require('node-fetch');
+const axios = require('axios');
 const cwr = require('../utils/createWebResp');
 const winston = require('../config/winston');
 
@@ -76,16 +77,8 @@ const getTronPowerInfo = async (req, res) => {
 const getCheckNetworkStatus = async (req, res) => {
   try {
     const url = 'https://apilist.tronscan.org/api/system/status';
-    const options = {
-      method: 'GET',
-    };
-
-    const result = await fetch(url, options)
-      .then((res) => res.json())
-      .then((json) => winston.log.info(json))
-      .catch((err) => winston.log.error(`error:${err}`));
-
-    return cwr.createWebResp(res, 200, true);
+    const response = await axios.get(url);
+    return cwr.createWebResp(res, 200, response.data);
   } catch (e) {
     return cwr.errorWebResp(
       res,

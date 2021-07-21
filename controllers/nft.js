@@ -1,17 +1,21 @@
 const cwr = require('../utils/createWebResp');
 const winston = require('../config/winston');
-const {removeFile, readFile, isExist, addFileOnIPFS} = require('../services/nft');
+const {
+  removeFile,
+  readFile,
+  isExist,
+  addFileOnIPFS,
+} = require('../services/nft');
 
 const postUploadMetadata = async (req, res) => {
   try {
     const {metadata, path} = req.body;
-    if(!metadata)
-    {
+    if (!metadata) {
       return cwr.errorWebResp(
-          res,
-          500,
-          `E0000 - postUploadMetadata`,
-          "Nothing is uploaded.",
+        res,
+        500,
+        `E0000 - postUploadMetadata`,
+        'Nothing is uploaded.',
       );
     }
     const {hash, result} = await addFileOnIPFS(
@@ -33,13 +37,12 @@ const postUploadMetadata = async (req, res) => {
 
 const postUploadFile = async (req, res) => {
   try {
-    if(!req.file)
-    {
+    if (!req.file) {
       return cwr.errorWebResp(
-          res,
-          500,
-          `E0000 - postUploadFile`,
-          "Nothing is uploaded.",
+        res,
+        500,
+        `E0000 - postUploadFile`,
+        'Nothing is uploaded.',
       );
     }
     const rawFile = await readFile(req.tmpDirectory + req.uploadFileName[0]);
@@ -59,13 +62,12 @@ const postUploadFile = async (req, res) => {
 
 const postUploadBio = async (req, res) => {
   try {
-    if(!req.file)
-    {
+    if (!req.file) {
       return cwr.errorWebResp(
-          res,
-          500,
-          `E0000 - postUploadBio`,
-          "Nothing is uploaded.",
+        res,
+        500,
+        `E0000 - postUploadBio`,
+        'Nothing is uploaded.',
       );
     }
     const rawFile = await readFile(req.tmpDirectory + req.uploadFileName[0]);
@@ -91,9 +93,8 @@ const postMoveFile = async (req, res) => {
     await ipfs.files.mv('/src-dir', '/dst-dir')
     await ipfs.files.mv(['/src-file1', '/src-file2'], '/dst-dir')
     */
-    if (!await isExist(req, from))
-    {
-      throw from + ' is not exist on IPFS';
+    if (!(await isExist(req, from))) {
+      throw `${from} is not exist on IPFS`;
     }
     await req.ipfs.files.mv(from, to);
     const readTo = await req.ipfs.files.stat(to);
@@ -115,9 +116,8 @@ const postRemove = async (req, res) => {
     // To remove a directory
     await ipfs.files.rm('/my/beautiful/directory', { recursive: true })
     */
-    if (!await isExist(req, path))
-    {
-      throw path + ' is not exist on IPFS';
+    if (!(await isExist(req, path))) {
+      throw `${path} is not exist on IPFS`;
     }
     const result = await req.ipfs.files.stat(path);
     const hash = result.cid.toString();
@@ -136,13 +136,12 @@ const postUploadFiles = async (req, res) => {
   try {
     const fileHash = [];
     const fileResult = [];
-    if(!req.files)
-    {
+    if (!req.files) {
       return cwr.errorWebResp(
-          res,
-          500,
-          `E0000 - postUploadFiles`,
-          "Nothing is uploaded.",
+        res,
+        500,
+        `E0000 - postUploadFiles`,
+        'Nothing is uploaded.',
       );
     }
     for (let i = 0; i < req.files.length; i++) {
@@ -201,13 +200,12 @@ const postMakeDirectory = async (req, res) => {
 const postUploadFileAndMeta = async (req, res) => {
   try {
     const {metadata} = req.body;
-    if(!req.file || !metadata)
-    {
+    if (!req.file || !metadata) {
       return cwr.errorWebResp(
-          res,
-          500,
-          `E0000 - postUploadFileAndMeta`,
-          "Nothing is uploaded.",
+        res,
+        500,
+        `E0000 - postUploadFileAndMeta`,
+        'Nothing is uploaded.',
       );
     }
     const rawFile = await readFile(req.tmpDirectory + req.uploadFileName[0]);
@@ -217,8 +215,8 @@ const postUploadFileAndMeta = async (req, res) => {
       rawFile,
       req.nodeFilePath,
     );
-    const fileResult = fileAdd.result,
-      fileHash = fileAdd.hash;
+    const fileResult = fileAdd.result;
+    const fileHash = fileAdd.hash;
 
     const parseMetadata = JSON.parse(metadata);
     parseMetadata.NFT_IPFS_HASH = fileHash;
@@ -230,8 +228,8 @@ const postUploadFileAndMeta = async (req, res) => {
       JSON.stringify(parseMetadata),
       req.nodeMetaPath,
     );
-    const metaResult = metaAdd.result,
-      metaHash = metaAdd.hash;
+    const metaResult = metaAdd.result;
+    const metaHash = metaAdd.hash;
 
     removeFile(req.tmpDirectory, req.uploadFileName[0]);
     return cwr.createWebResp(res, 200, {
