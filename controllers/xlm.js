@@ -538,6 +538,7 @@ const getMinimumBalance = async (req, res) => {
     const subEntryCount = accountDetail.subentry_count;
     const numSponsoring = accountDetail.num_sponsoring;
     const numSponsored = accountDetail.num_sponsored;
+    const balance = accountDetail.balances;
     const minimumBalance =
       (2 + subEntryCount + numSponsoring - numSponsored) * 0.5;
     const expression = `(2 + subEntryCount + numSponsoring - numSponsored) * 0.5`;
@@ -547,6 +548,7 @@ const getMinimumBalance = async (req, res) => {
       numSponsoring,
       numSponsored,
       expression,
+      balance,
     });
   } catch (e) {
     return cwr.errorWebResp(
