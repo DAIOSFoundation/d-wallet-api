@@ -48,4 +48,21 @@ router.post('/moveFile', mw.ipfsNetwork, nftController.postMoveFile);
 
 router.post('/remove', mw.ipfsNetwork, nftController.postRemove);
 
+router.post('/nftList', mw.xlmNetwork, nftController.getAccountDetailForNFT);
+
+router.post(
+  '/uploadAll',
+  mw.multerInitialize,
+  mw.upload.fields([
+    {name: 'nftOriginal', maxCount: 1},
+    {name: 'bioOriginal', maxCount: 1},
+    {name: 'bioThumbnail', maxCount: 1},
+    {name: 'variation', maxCount: 10},
+    {name: 'variationThumbnail', maxCount: 10},
+    {name: 'metadata', maxCount: 1},
+  ]),
+  mw.ipfsNetwork,
+  nftController.postUploadAll,
+);
+
 module.exports = router;

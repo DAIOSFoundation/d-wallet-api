@@ -36,6 +36,9 @@ const addFileOnIPFS = async (req, name, file, path) => {
   );
   const hash = result.cid.toString();
   if (await isExist(req, path + result.cid.toString())) {
+    winston.log.warn(
+      path + result.cid.toString() + ' is already exist on IPFS',
+    );
     return {hash, result};
   }
   await req.ipfs.files.cp(
