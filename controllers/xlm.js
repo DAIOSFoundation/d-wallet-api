@@ -158,12 +158,13 @@ const postAccount = async (req, res) => {
 
 const postAccountSponsor = async (req, res) => {
   try {
-    const {sponsoredSecret, sponsorSecret} = req.body;
-    const {server, txOptions} = req;
+    const {sponsoredSecret, sponsorSecret, startingBalance} = req.body;
+    const {server, txOptions, asset} = req;
 
     // Accounts
     const sponsoredAccount = StellarSdk.Keypair.fromSecret(sponsoredSecret);
     const sponsorAccount = StellarSdk.Keypair.fromSecret(sponsorSecret);
+
     const loadedSponsorAccount = await server.loadAccount(
       sponsorAccount.publicKey(),
     );
@@ -180,7 +181,13 @@ const postAccountSponsor = async (req, res) => {
       .addOperation(
         StellarSdk.Operation.createAccount({
           destination: sponsoredAccount.publicKey(),
-          startingBalance: '0',
+          startingBalance: startingBalance || '0',
+        }),
+      )
+      .addOperation(
+        StellarSdk.Operation.changeTrust({
+          source: sponsoredAccount.publicKey(),
+          asset,
         }),
       )
       .addOperation(
@@ -205,9 +212,9 @@ const postAccountSponsor = async (req, res) => {
 
 const postPayment = async (req, res) => {
   try {
-    const {toAddress, amount, memo, maxTime} = req.body;
+    const {toAddress, secretKey, amount, memo, maxTime} = req.body;
     const {asset, server, txOptions} = req;
-    const keypair = StellarSdk.Keypair.fromSecret(req.body.secretKey);
+    const keypair = StellarSdk.Keypair.fromSecret(secretKey);
     const fromAddress = keypair.publicKey();
     const loadedAccount = await server.loadAccount(fromAddress);
     const transaction = new StellarSdk.TransactionBuilder(
@@ -237,11 +244,61 @@ const postPayment = async (req, res) => {
   }
 };
 
+const postPaymentSponsor = async (req, res) => {
+  try {
+    const {toAddress, amount, memo, maxTime, secretKey, sponsorSecret} =
+      req.body;
+    const {asset, server, txOptions} = req;
+    const keypair = StellarSdk.Keypair.fromSecret(secretKey);
+    const fromAddress = keypair.publicKey();
+
+    // accounts
+    const sponsorAccount = StellarSdk.Keypair.fromSecret(sponsorSecret);
+    const loadedAccount = await server.loadAccount(fromAddress);
+
+    const transaction = new StellarSdk.TransactionBuilder(
+      loadedAccount,
+      txOptions,
+    )
+      .addOperation(
+        StellarSdk.Operation.beginSponsoringFutureReserves({
+          source: sponsorAccount.publicKey(), // reserve Sponsor
+          sponsoredId: fromAddress, // receive Sponsor
+        }),
+      )
+      .addOperation(
+        StellarSdk.Operation.payment({
+          destination: toAddress,
+          asset,
+          amount: amount.toString(),
+        }),
+      )
+      .addMemo(memo ? StellarSdk.Memo.text(memo) : StellarSdk.Memo.none())
+      .addOperation(
+        StellarSdk.Operation.endSponsoringFutureReserves({
+          source: fromAddress,
+        }),
+      )
+      .setTimeout(maxTime || xlmUtils.TIMEOUT)
+      .build();
+    transaction.sign(keypair, sponsorAccount);
+    const resp = await server.submitTransaction(transaction);
+    return cwr.createWebResp(res, 200, resp);
+  } catch (e) {
+    return cwr.errorWebResp(
+      res,
+      500,
+      `E0000 - postPaymentSponsor`,
+      xlmUtils.parseOperationError(e),
+    );
+  }
+};
+
 const postTrustAsset = async (req, res) => {
   try {
     const {asset, server, txOptions} = req;
-    const {maxTime} = req.body;
-    const keypair = StellarSdk.Keypair.fromSecret(req.body.secretKey);
+    const {maxTime, secretKey} = req.body;
+    const keypair = StellarSdk.Keypair.fromSecret(secretKey);
     const fromAddress = keypair.publicKey();
     const loadedAccount = await server.loadAccount(fromAddress);
     const transaction = new StellarSdk.TransactionBuilder(
@@ -264,11 +321,53 @@ const postTrustAsset = async (req, res) => {
   }
 };
 
+const postTrustAssetSponsor = async (req, res) => {
+  try {
+    const {asset, server, txOptions} = req;
+    const {maxTime, secretKey, sponsorSecret} = req.body;
+    const keypair = StellarSdk.Keypair.fromSecret(secretKey);
+    const fromAddress = keypair.publicKey();
+
+    // Accounts
+    const sponsorAccount = StellarSdk.Keypair.fromSecret(sponsorSecret);
+
+    const loadedAccount = await server.loadAccount(fromAddress);
+    const transaction = new StellarSdk.TransactionBuilder(
+      loadedAccount,
+      txOptions,
+    )
+      .addOperation(
+        StellarSdk.Operation.beginSponsoringFutureReserves({
+          source: sponsorAccount.publicKey(), // reserve Sponsor
+          sponsoredId: fromAddress, // receive Sponsor
+        }),
+      )
+      .addOperation(StellarSdk.Operation.changeTrust({asset}))
+      .addOperation(
+        StellarSdk.Operation.endSponsoringFutureReserves({
+          source: fromAddress,
+        }),
+      )
+      .setTimeout(maxTime || xlmUtils.TIMEOUT)
+      .build();
+    transaction.sign(sponsorAccount, keypair);
+    const resp = await server.submitTransaction(transaction);
+    return cwr.createWebResp(res, 200, resp);
+  } catch (e) {
+    return cwr.errorWebResp(
+      res,
+      500,
+      `E0000 - postTrustAssetSponsor`,
+      xlmUtils.parseOperationError(e),
+    );
+  }
+}
+
 const postChangeTrustAsset = async (req, res) => {
   try {
     const {asset, server, txOptions} = req;
-    const {maxTime, limit} = req.body;
-    const keypair = StellarSdk.Keypair.fromSecret(req.body.secretKey);
+    const {maxTime, limit, secretKey} = req.body;
+    const keypair = StellarSdk.Keypair.fromSecret(secretKey);
     const fromAddress = keypair.publicKey();
     const loadedAccount = await server.loadAccount(fromAddress);
     const transaction = new StellarSdk.TransactionBuilder(
@@ -671,7 +770,9 @@ module.exports = {
   postAccount,
   postAccountSponsor,
   postPayment,
+  postPaymentSponsor,
   postTrustAsset,
+  postTrustAssetSponsor,
   postChangeTrustAsset,
   getLastBlock,
   getTransactions,

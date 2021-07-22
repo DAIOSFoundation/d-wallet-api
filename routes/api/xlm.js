@@ -37,7 +37,12 @@ router.get('/accountDetail', mw.xlmNetwork, xlmController.getAccountDetail);
 router.post('/account', mw.xlmNetwork, xlmController.postAccount);
 
 // Create Account from Sponsor
-router.post('/accountSponsor', mw.xlmNetwork, xlmController.postAccountSponsor);
+router.post(
+  '/accountSponsor',
+  mw.xlmNetwork,
+  mw.xlmAsset,
+  xlmController.postAccountSponsor,
+);
 
 // 트랜잭션 전송, 금액의 지불
 // 계정은 최소 1루멘을 유지해야함
@@ -46,6 +51,14 @@ router.post(
   mw.xlmNetwork,
   mw.xlmAsset, // 발행된 자산 (token)
   xlmController.postPayment,
+);
+
+// 트랜잭션 전송, Sponsor
+router.post(
+  '/paymentSponsor',
+  mw.xlmNetwork,
+  mw.xlmAsset, // 발행된 자산 (token)
+  xlmController.postPaymentSponsor,
 );
 
 // trust, 자산 신뢰
@@ -62,6 +75,14 @@ router.post(
   mw.xlmNetwork,
   mw.xlmAsset, // 발행된 자산 (token)
   xlmController.postTrustAsset,
+);
+
+// trustline with sponsor
+router.post(
+  '/trustAssetSponsor',
+  mw.xlmNetwork,
+  mw.xlmAsset, // 발행된 자산 (token)
+  xlmController.postTrustAssetSponsor,
 );
 
 // limit 변경, 자산제거 (limit=0)

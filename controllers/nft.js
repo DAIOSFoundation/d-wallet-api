@@ -255,9 +255,9 @@ const getAccountDetailForNFT = async (req, res) => {
     const {address} = req.query;
     const {server} = req;
     const account = await server.loadAccount(address);
-    const balances = account.balances;
+    const {balances} = account;
     let ownedToken = 0;
-    let NFTList = [];
+    const NFTList = [];
 
     for (const token in balances) {
       if (balances[token]?.balance > 0 && !!balances[token]?.asset_issuer) {
