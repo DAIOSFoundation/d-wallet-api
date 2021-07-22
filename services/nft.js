@@ -4,12 +4,10 @@ const winston = require('../config/winston');
 // common functions
 const removeFile = (path, fileName) => {
   fs.access(path + fileName, fs.constants.F_OK, (err) => {
-    if (err) return winston.log.error('삭제할 수 없는 파일입니다');
-    fs.unlink(path + fileName, (err) =>
-      err
-        ? winston.log.error(err)
-        : winston.log.info(`${path + fileName} 를 정상적으로 삭제했습니다`),
-    );
+    if (err) return winston.log.error('file delete fails -> ' + path + fileName);
+    fs.unlink(path + fileName, (err) => {
+      if (err) throw err;
+    });
   });
 };
 
@@ -36,9 +34,6 @@ const addFileOnIPFS = async (req, name, file, path) => {
   );
   const hash = result.cid.toString();
   if (await isExist(req, path + result.cid.toString())) {
-    winston.log.warn(
-      path + result.cid.toString() + ' is already exist on IPFS',
-    );
     return {hash, result};
   }
   await req.ipfs.files.cp(
