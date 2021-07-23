@@ -25,7 +25,7 @@ const postUploadMetadata = async (req, res) => {
       JSON.stringify(metadata),
       path,
     );
-    return cwr.createWebResp(res, 200, {metaHash: hash, result});
+    return cwr.createWebResp(res, 200, {ipfsMetaHash: hash, result});
   } catch (e) {
     return cwr.errorWebResp(
       res,
@@ -54,7 +54,7 @@ const postUploadFile = async (req, res) => {
       req.nodeFilePath,
     );
     removeFile(req.tmpDirectory, req.uploadFileName[0]);
-    return cwr.createWebResp(res, 200, {nftHash: hash, result});
+    return cwr.createWebResp(res, 200, {ipfsFileHash: hash, result});
   } catch (e) {
     removeFile(req.tmpDirectory, req.uploadFileName[0]);
     return cwr.errorWebResp(res, 500, `E0000 - postUploadFile`, e.message || e);
@@ -79,7 +79,7 @@ const postUploadBio = async (req, res) => {
       req.nodeBioPath,
     );
     removeFile(req.tmpDirectory, req.uploadFileName[0]);
-    return cwr.createWebResp(res, 200, {bioHash: hash, result});
+    return cwr.createWebResp(res, 200, {ipfsBioHash: hash, result});
   } catch (e) {
     removeFile(req.tmpDirectory, req.uploadFileName[0]);
     return cwr.errorWebResp(res, 500, `E0000 - postUploadBio`, e.message || e);
@@ -127,7 +127,7 @@ const postRemove = async (req, res) => {
     } else if (result.type === 'directory') {
       await req.ipfs.files.rm(path, {recursive: !!isRecursive});
     }
-    return cwr.createWebResp(res, 200, {hash, result});
+    return cwr.createWebResp(res, 200, {postHash: hash, result});
   } catch (e) {
     return cwr.errorWebResp(res, 500, `E0000 - postMoveFile`, e.message || e);
   }
@@ -165,8 +165,8 @@ const postUploadFiles = async (req, res) => {
       }
     }
     return cwr.createWebResp(res, 200, {
-      fileHash,
-      fileResult,
+      ipfsFilesHash: fileHash,
+      results: fileResult,
     });
   } catch (e) {
     for (let i = 0; i < req.uploadFileName.length; i++) {
@@ -187,7 +187,7 @@ const postMakeDirectory = async (req, res) => {
     await req.ipfs.files.mkdir(path, {parents: true, pin: false});
     const result = await req.ipfs.files.stat(path);
     const folderHash = result.cid.toString();
-    return cwr.createWebResp(res, 200, {folderHash, result});
+    return cwr.createWebResp(res, 200, {ipfsFolderHash: folderHash, result});
   } catch (e) {
     return cwr.errorWebResp(
       res,
@@ -234,8 +234,8 @@ const postUploadFileAndMeta = async (req, res) => {
 
     removeFile(req.tmpDirectory, req.uploadFileName[0]);
     return cwr.createWebResp(res, 200, {
-      fileHash,
-      metaHash,
+      ipfsNftHash: fileHash,
+      ipfsMetaHash: metaHash,
       fileResult,
       metaResult,
     });
@@ -257,7 +257,7 @@ const getAccountDetailForNFT = async (req, res) => {
     const account = await server.loadAccount(address);
     const {balances} = account;
     let ownedToken = 0;
-    const NFTList = [];
+    const nftList = [];
 
     for (const token in balances) {
       if (balances[token]?.balance > 0 && !!balances[token]?.asset_issuer) {
@@ -274,17 +274,17 @@ const getAccountDetailForNFT = async (req, res) => {
             process.env.IPFS_URL + metadataHash + '/metadata.json',
           );
           const data = {
-            NFTName: balances[token]?.asset_code,
+            nftName: balances[token]?.asset_code,
             balance: balances[token]?.balance,
-            'NFTAddress(issuer)': balances[token]?.asset_issuer,
-            ipfsHash: metadataHash,
+            nftAddress: balances[token]?.asset_issuer,
+            ipfsMetaHash: metadataHash,
             metadata: response?.data,
           };
-          NFTList.push(data);
+          nftList.push(data);
         } catch (e) {}
       }
     }
-    return cwr.createWebResp(res, 200, {ownedToken, NFTList});
+    return cwr.createWebResp(res, 200, {ownedToken, nftList});
   } catch (e) {
     return cwr.errorWebResp(
       res,
@@ -306,12 +306,14 @@ const postUploadAll = async (req, res) => {
     const fileResult = {};
     const fields = [
       'nftOriginal',
+      'NFTThumbnail',
       'bioOriginal',
       'bioThumbnail',
       'variation',
       'variationThumbnail',
     ];
     const paths = [
+      req.nodeFilePath,
       req.nodeFilePath,
       req.nodeBioPath,
       req.nodeBioPath,
@@ -334,11 +336,24 @@ const postUploadAll = async (req, res) => {
         fieldHash.push(result.hash);
         fieldResult.push(result);
       }
-      parseMetadata[fields[field]] =
-        fieldHash.length === 1 ? fieldHash[0] : fieldHash;
-      fileHash[fields[field]] =
-        fieldHash.length === 1 ? fieldHash[0] : fieldHash;
-      fileResult[fields[field]] = fieldResult;
+      parseMetadata[fields[field] + 'Hash'] =
+        fieldHash.length === 1
+          ? fieldHash[0]
+          : fieldHash.length === 0
+          ? undefined
+          : fieldHash;
+      fileHash[fields[field] + 'Hash'] =
+        fieldHash.length === 1
+          ? fieldHash[0]
+          : fieldHash.length === 0
+          ? undefined
+          : fieldHash;
+      fileResult[fields[field]] =
+        fieldResult.length === 1
+          ? fieldResult[0]
+          : fieldResult.length === 0
+          ? undefined
+          : fieldResult;
     }
 
     const metaAdd = await addFileOnIPFS(
@@ -348,23 +363,47 @@ const postUploadAll = async (req, res) => {
       req.nodeMetaPath,
     );
     const metaResult = metaAdd.result;
-    const metaHash = metaAdd.hash;
+    const ipfsMetaHash = metaAdd.hash;
 
     for (let i = 0; i < req.uploadFileName.length; i++) {
       removeFile(req.tmpDirectory, req.uploadFileName[i]);
     }
     return cwr.createWebResp(res, 200, {
       fileHash,
-      metaHash,
+      ipfsMetaHash,
+      uploadedMetadata: parseMetadata,
       fileResult,
       metaResult,
-      uploadedMetadata: parseMetadata,
     });
   } catch (e) {
     for (let i = 0; i < req.uploadFileName.length; i++) {
       removeFile(req.tmpDirectory, req.uploadFileName[i]);
     }
     return cwr.errorWebResp(res, 500, `E0000 - postUploadAll`, e.message || e);
+  }
+};
+
+const getIpfs = async (req, res) => {
+  try {
+    const {hash} = req.query;
+    const files = [];
+    for await (const file of req.ipfs.ls(hash)) {
+      files.push({
+        fileHash: file.cid.toString(),
+        path: file.path,
+        name: file.name,
+        type: file.type,
+        codec: file.cid.codec,
+      });
+    }
+    if (files.length === 1) {
+      const file = files[0];
+      return cwr.createWebResp(res, 200, {file});
+    } else {
+      return cwr.createWebResp(res, 200, {files});
+    }
+  } catch (e) {
+    return cwr.errorWebResp(res, 500, `E0000 - getIpfs`, e.message || e);
   }
 };
 
@@ -379,4 +418,5 @@ module.exports = {
   postRemove,
   getAccountDetailForNFT,
   postUploadAll,
+  getIpfs,
 };

@@ -55,6 +55,7 @@ router.post(
   mw.multerInitialize,
   mw.upload.fields([
     {name: 'nftOriginal', maxCount: 1},
+    {name: 'NFTThumbnail', maxCount: 1},
     {name: 'bioOriginal', maxCount: 1},
     {name: 'bioThumbnail', maxCount: 1},
     {name: 'variation', maxCount: 10},
@@ -64,5 +65,7 @@ router.post(
   mw.ipfsNetwork,
   nftController.postUploadAll,
 );
+
+router.get('/ipfs', mw.ipfsNetwork, nftController.getIpfs);
 
 module.exports = router;

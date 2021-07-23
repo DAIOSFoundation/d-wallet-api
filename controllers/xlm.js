@@ -361,7 +361,7 @@ const postTrustAssetSponsor = async (req, res) => {
       xlmUtils.parseOperationError(e),
     );
   }
-}
+};
 
 const postChangeTrustAsset = async (req, res) => {
   try {

@@ -4,7 +4,7 @@ const Web3 = require('web3');
 const Client = require('bitcoin-core');
 const TronWeb = require('tronweb');
 const ethers = require('ethers');
-const {create} = require('ipfs-http-client');
+const {create, globSource} = require('ipfs-http-client');
 const multer = require('multer');
 const cwr = require('../utils/createWebResp');
 const stellarConfig = require('../config/XLM/stellar');
@@ -274,6 +274,7 @@ const tronSendRawTransaction = async (req, res) => {
 const ipfsNetwork = async (req, res, next) => {
   try {
     req.ipfs = create(process.env.NODE_ENDPOINT);
+    req.globSource = globSource;
     req.tmpDirectory = process.env.FILE_TEMP_DIRECTORY;
     req.ipfsPath = process.env.IPFS_GLOBAL_PATH;
     req.nodeFilePath = process.env.IFPS_NODE_PATH_FILE;
