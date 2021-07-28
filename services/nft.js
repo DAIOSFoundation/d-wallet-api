@@ -5,7 +5,7 @@ const winston = require('../config/winston');
 const removeFile = (path, fileName) => {
   fs.access(path + fileName, fs.constants.F_OK, (err) => {
     if (err)
-      return winston.log.error('file delete fails -> ' + path + fileName);
+      return winston.log.error(`file delete fails -> ${path}${fileName}`);
     fs.unlink(path + fileName, (err) => {
       if (err) throw err;
     });

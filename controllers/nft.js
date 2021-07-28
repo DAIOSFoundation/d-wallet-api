@@ -1,5 +1,5 @@
-const cwr = require('../utils/createWebResp');
 const axios = require('axios');
+const cwr = require('../utils/createWebResp');
 const winston = require('../config/winston');
 const {
   removeFile,
@@ -266,7 +266,7 @@ const getAccountDetailForNFT = async (req, res) => {
           const asset_account = await server.loadAccount(
             balances[token]?.asset_issuer,
           );
-          ownedToken = ownedToken + 1;
+          ownedToken += 1;
           const metadataHash = Buffer.from(
             asset_account?.data_attr?.ipfshash,
             'base64',
@@ -278,17 +278,17 @@ const getAccountDetailForNFT = async (req, res) => {
             ipfsMetaHash: metadataHash,
           };
           const response = await axios.get(
-            process.env.IPFS_URL + metadataHash + '/metadata.json',
+            `${process.env.IPFS_URL + metadataHash}/metadata.json`,
             {timeout: 300},
           );
-          data['metadata'] = response?.data;
-          for (let key in response?.data) {
+          data.metadata = response?.data;
+          for (const key in response?.data) {
             if (
               typeof response?.data[key] === 'string' &&
               ipfsUtils.validator(response?.data[key])
             ) {
               for await (const file of req.ipfs.ls(response?.data[key])) {
-                data[key + 'Image'] = file.path;
+                data[`${key}Image`] = file.path;
               }
             }
           }
@@ -341,10 +341,10 @@ const postUploadAll = async (req, res) => {
       req.nodeFilePath,
       req.nodeFilePath,
     ];
-    for (let field in fields) {
+    for (const field in fields) {
       const fieldHash = [];
       const fieldResult = [];
-      for (let data in req.files[fields[field]]) {
+      for (const data in req.files[fields[field]]) {
         const rawFile = await readFile(
           req.tmpDirectory + req.uploadFileName[0],
         );
@@ -357,13 +357,13 @@ const postUploadAll = async (req, res) => {
         fieldHash.push(result.hash);
         fieldResult.push(result);
       }
-      parseMetadata[fields[field] + 'Hash'] =
+      parseMetadata[`${fields[field]}Hash`] =
         fieldHash.length === 1
           ? fieldHash[0]
           : fieldHash.length === 0
           ? undefined
           : fieldHash;
-      fileHash[fields[field] + 'Hash'] =
+      fileHash[`${fields[field]}Hash`] =
         fieldHash.length === 1
           ? fieldHash[0]
           : fieldHash.length === 0
@@ -420,9 +420,8 @@ const getIpfs = async (req, res) => {
     if (files.length === 1) {
       const file = files[0];
       return cwr.createWebResp(res, 200, {file});
-    } else {
-      return cwr.createWebResp(res, 200, {files});
     }
+    return cwr.createWebResp(res, 200, {files});
   } catch (e) {
     return cwr.errorWebResp(res, 500, `E0000 - getIpfs`, e.message || e);
   }
