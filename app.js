@@ -32,6 +32,15 @@ checkEnv([
   'MONGO_DB_PASSWORD',
   'GMAIL_USER',
   'GMAIL_APP_PASS',
+  'NODE_ENDPOINT',
+  'IPFS_URL',
+  'FILE_TEMP_DIRECTORY',
+  'IPFS_GLOBAL_PATH',
+  'IPFS_NODE_PATH_FILE',
+  'IPFS_NODE_PATH_METADATA',
+  'IPFS_NODE_PATH_BIO',
+  'DID_ASSET_CODE',
+  'DID_ASSET_PUBLIC',
 ]);
 
 const createError = require('http-errors');
