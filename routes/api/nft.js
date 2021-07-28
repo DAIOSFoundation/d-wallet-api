@@ -48,7 +48,12 @@ router.post('/moveFile', mw.ipfsNetwork, nftController.postMoveFile);
 
 router.post('/remove', mw.ipfsNetwork, nftController.postRemove);
 
-router.get('/nftList', mw.xlmNetwork, nftController.getAccountDetailForNFT);
+router.get(
+  '/nftList',
+  mw.xlmNetwork,
+  mw.ipfsNetwork,
+  nftController.getAccountDetailForNFT,
+);
 
 router.post(
   '/uploadAll',

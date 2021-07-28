@@ -7,6 +7,7 @@ const {
   isExist,
   addFileOnIPFS,
 } = require('../services/nft');
+const {ipfsUtils} = require('../utils/ipfs/ipfsUtils');
 
 const postUploadMetadata = async (req, res) => {
   try {
@@ -258,8 +259,8 @@ const getAccountDetailForNFT = async (req, res) => {
     const {balances} = account;
     let ownedToken = 0;
     const nftList = [];
-
-    for (const token in balances) {
+    const promiseList = [];
+    const promiseAll = async (token) => {
       if (balances[token]?.balance > 0 && !!balances[token]?.asset_issuer) {
         try {
           const asset_account = await server.loadAccount(
@@ -270,20 +271,40 @@ const getAccountDetailForNFT = async (req, res) => {
             asset_account?.data_attr?.ipfshash,
             'base64',
           ).toString('utf8');
-          const response = await axios.get(
-            process.env.IPFS_URL + metadataHash + '/metadata.json',
-          );
           const data = {
             nftName: balances[token]?.asset_code,
             balance: balances[token]?.balance,
             nftAddress: balances[token]?.asset_issuer,
             ipfsMetaHash: metadataHash,
-            metadata: response?.data,
           };
+          const response = await axios.get(
+            process.env.IPFS_URL + metadataHash + '/metadata.json',
+            {timeout: 300},
+          );
+          data['metadata'] = response?.data;
+          for (let key in response?.data) {
+            if (
+              typeof response?.data[key] === 'string' &&
+              ipfsUtils.validator(response?.data[key])
+            ) {
+              for await (const file of req.ipfs.ls(response?.data[key])) {
+                data[key + 'Image'] = file.path;
+              }
+            }
+          }
+
           nftList.push(data);
-        } catch (e) {}
+        } catch (e) {
+          winston.log.warn(e.message || e);
+        }
       }
+    };
+
+    for (token in balances) {
+      promiseList.push(promiseAll(token));
     }
+    await Promise.all(promiseList);
+
     return cwr.createWebResp(res, 200, {ownedToken, nftList});
   } catch (e) {
     return cwr.errorWebResp(
