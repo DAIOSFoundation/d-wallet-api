@@ -73,4 +73,6 @@ router.post(
 
 router.get('/ipfs', mw.ipfsNetwork, nftController.getIpfs);
 
+router.get('/asset', mw.xlmNetwork, mw.ipfsNetwork, nftController.getAsset);
+
 module.exports = router;

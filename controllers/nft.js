@@ -1,5 +1,5 @@
-const cwr = require('../utils/createWebResp');
 const axios = require('axios');
+const cwr = require('../utils/createWebResp');
 const winston = require('../config/winston');
 const {
   removeFile,
@@ -266,7 +266,7 @@ const getAccountDetailForNFT = async (req, res) => {
           const asset_account = await server.loadAccount(
             balances[token]?.asset_issuer,
           );
-          ownedToken = ownedToken + 1;
+          ownedToken += 1;
           const metadataHash = Buffer.from(
             asset_account?.data_attr?.ipfshash,
             'base64',
@@ -277,20 +277,24 @@ const getAccountDetailForNFT = async (req, res) => {
             nftAddress: balances[token]?.asset_issuer,
             ipfsMetaHash: metadataHash,
           };
-          const response = await axios.get(
-            process.env.IPFS_URL + metadataHash + '/metadata.json',
-            {timeout: 300},
-          );
-          data['metadata'] = response?.data;
-          for (let key in response?.data) {
-            if (
-              typeof response?.data[key] === 'string' &&
-              ipfsUtils.validator(response?.data[key])
-            ) {
-              for await (const file of req.ipfs.ls(response?.data[key])) {
-                data[key + 'Image'] = file.path;
+          try {
+            const response = await axios.get(
+              `${process.env.IPFS_URL + metadataHash}/metadata.json`,
+              {timeout: 1500},
+            );
+            data.metadata = response?.data;
+            for (const key in response?.data) {
+              if (
+                typeof response?.data[key] === 'string' &&
+                ipfsUtils.validator(response?.data[key])
+              ) {
+                for await (const file of req.ipfs.ls(response?.data[key])) {
+                  data[`${key}Image`] = file.path;
+                }
               }
             }
+          } catch (e) {
+            winston.log.warn(`[IPFS query fail] ${e.message || e}`);
           }
 
           nftList.push(data);
@@ -305,7 +309,11 @@ const getAccountDetailForNFT = async (req, res) => {
     }
     await Promise.all(promiseList);
 
-    return cwr.createWebResp(res, 200, {ownedToken, nftList});
+    return cwr.createWebResp(res, 200, {
+      count: nftList.length,
+      ownedToken,
+      nftList,
+    });
   } catch (e) {
     return cwr.errorWebResp(
       res,
@@ -341,10 +349,10 @@ const postUploadAll = async (req, res) => {
       req.nodeFilePath,
       req.nodeFilePath,
     ];
-    for (let field in fields) {
+    for (const field in fields) {
       const fieldHash = [];
       const fieldResult = [];
-      for (let data in req.files[fields[field]]) {
+      for (const data in req.files[fields[field]]) {
         const rawFile = await readFile(
           req.tmpDirectory + req.uploadFileName[0],
         );
@@ -357,13 +365,13 @@ const postUploadAll = async (req, res) => {
         fieldHash.push(result.hash);
         fieldResult.push(result);
       }
-      parseMetadata[fields[field] + 'Hash'] =
+      parseMetadata[`${fields[field]}Hash`] =
         fieldHash.length === 1
           ? fieldHash[0]
           : fieldHash.length === 0
           ? undefined
           : fieldHash;
-      fileHash[fields[field] + 'Hash'] =
+      fileHash[`${fields[field]}Hash`] =
         fieldHash.length === 1
           ? fieldHash[0]
           : fieldHash.length === 0
@@ -420,11 +428,93 @@ const getIpfs = async (req, res) => {
     if (files.length === 1) {
       const file = files[0];
       return cwr.createWebResp(res, 200, {file});
-    } else {
-      return cwr.createWebResp(res, 200, {files});
     }
+    return cwr.createWebResp(res, 200, {files});
   } catch (e) {
     return cwr.errorWebResp(res, 500, `E0000 - getIpfs`, e.message || e);
+  }
+};
+
+const getAsset = async (req, res) => {
+  try {
+    const {issuer, assetName} = req.query;
+    let data;
+    if (issuer) {
+      const assetFromIssuer = await req.server
+        .assets()
+        .forIssuer(issuer)
+        .call();
+      if (assetFromIssuer?.records?.length > 1) {
+        return cwr.errorWebResp(
+          res,
+          500,
+          `E0000 - getAsset`,
+          'this issuer cannot be specified.',
+        );
+      }
+      const assetName = assetFromIssuer?.records[0]?.asset_code;
+      const asset_account = await req.server.loadAccount(issuer);
+      const metadataHash = Buffer.from(
+        asset_account?.data_attr?.ipfshash,
+        'base64',
+      ).toString('utf8');
+      const response = await axios.get(
+        `${process.env.IPFS_URL + metadataHash}/metadata.json`,
+        {timeout: 1500},
+      );
+      data = {
+        nftName: assetName,
+        nftAddress: issuer,
+        ipfsMetaHash: metadataHash,
+        metadata: response?.data,
+      };
+    } else if (assetName) {
+      const assetFromCode = await req.server.assets().forCode(assetName).call();
+      if (assetFromCode?.records?.length > 1) {
+        return cwr.errorWebResp(
+          res,
+          500,
+          `E0000 - getAsset`,
+          'this assetName cannot be specified.'
+        );
+      }
+      const nftAddress = assetFromCode?.records[0]?.asset_issuer;
+      const asset_account = await req.server.loadAccount(nftAddress);
+      const metadataHash = Buffer.from(
+        asset_account?.data_attr?.ipfshash,
+        'base64',
+      ).toString('utf8');
+      const response = await axios.get(
+        `${process.env.IPFS_URL + metadataHash}/metadata.json`,
+        {timeout: 1500},
+      );
+      data = {
+        nftName: assetName,
+        nftAddress,
+        ipfsMetaHash: metadataHash,
+        metadata: response?.data,
+      };
+    } else {
+      return cwr.errorWebResp(
+        res,
+        500,
+        `E0000 - getAsset`,
+        'please input issuer or assetName!',
+      );
+    }
+    for (const key in data.metadata) {
+      if (
+        typeof data.metadata[key] === 'string' &&
+        ipfsUtils.validator(data.metadata[key])
+      ) {
+        for await (const file of req.ipfs.ls(data.metadata[key])) {
+          data[`${key}Image`] = file.path;
+        }
+      }
+    }
+    return cwr.createWebResp(res, 200, {data});
+  } catch (e) {
+    return cwr.errorWebResp(res, 500, `E0000 - getAsset`, e.message || e);
   }
 };
 
@@ -440,4 +530,5 @@ module.exports = {
   getAccountDetailForNFT,
   postUploadAll,
   getIpfs,
+  getAsset,
 };
