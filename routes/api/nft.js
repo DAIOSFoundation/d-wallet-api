@@ -60,7 +60,7 @@ router.post(
   mw.multerInitialize,
   mw.upload.fields([
     {name: 'nftOriginal', maxCount: 1},
-    {name: 'NFTThumbnail', maxCount: 1},
+    {name: 'nftThumbnail', maxCount: 1},
     {name: 'bioOriginal', maxCount: 1},
     {name: 'bioThumbnail', maxCount: 1},
     {name: 'variation', maxCount: 10},

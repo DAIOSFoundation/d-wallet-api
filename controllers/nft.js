@@ -335,7 +335,7 @@ const postUploadAll = async (req, res) => {
     const fileResult = {};
     const fields = [
       'nftOriginal',
-      'NFTThumbnail',
+      'nftThumbnail',
       'bioOriginal',
       'bioThumbnail',
       'variation',
@@ -475,7 +475,7 @@ const getAsset = async (req, res) => {
           res,
           500,
           `E0000 - getAsset`,
-          'this assetName cannot be specified.'
+          'this assetName cannot be specified.',
         );
       }
       const nftAddress = assetFromCode?.records[0]?.asset_issuer;
