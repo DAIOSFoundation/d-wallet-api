@@ -63,6 +63,7 @@ router.post(
     {name: 'nftThumbnail', maxCount: 1},
     {name: 'bioOriginal', maxCount: 1},
     {name: 'bioThumbnail', maxCount: 1},
+    {name: 'nftPenProfileImage', maxCount: 1},
     {name: 'variation', maxCount: 10},
     {name: 'variationThumbnail', maxCount: 10},
     {name: 'metadata', maxCount: 1},

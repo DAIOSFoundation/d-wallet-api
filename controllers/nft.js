@@ -340,12 +340,14 @@ const postUploadAll = async (req, res) => {
       'bioThumbnail',
       'variation',
       'variationThumbnail',
+      'nftPenProfileImage',
     ];
     const paths = [
       req.nodeFilePath,
       req.nodeFilePath,
       req.nodeBioPath,
       req.nodeBioPath,
+      req.nodeFilePath,
       req.nodeFilePath,
       req.nodeFilePath,
     ];
