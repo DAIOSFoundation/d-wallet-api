@@ -273,13 +273,14 @@ const tronSendRawTransaction = async (req, res) => {
 /// /////////////////// Middleware for IPFS //////////////////////
 const ipfsNetwork = async (req, res, next) => {
   try {
+    const {network} = req.body;
     req.ipfs = create(process.env.NODE_ENDPOINT);
     req.globSource = globSource;
     req.tmpDirectory = process.env.FILE_TEMP_DIRECTORY;
     req.ipfsPath = process.env.IPFS_GLOBAL_PATH;
-    req.nodeFilePath = process.env.IPFS_NODE_PATH_FILE;
-    req.nodeMetaPath = process.env.IPFS_NODE_PATH_METADATA;
-    req.nodeBioPath = process.env.IPFS_NODE_PATH_BIO;
+    req.nodeFilePath = network === "prod" ? process.env.PROD_IPFS_NODE_PATH_FILE : process.env.DEV_IPFS_NODE_PATH_FILE;
+    req.nodeMetaPath = network === "prod" ? process.env.PROD_IPFS_NODE_PATH_METADATA : process.env.DEV_IPFS_NODE_PATH_METADATA;
+    req.nodeBioPath = network === "prod" ? process.env.PROD_IPFS_NODE_PATH_BIO : process.env.DEV_IPFS_NODE_PATH_BIO;
     next();
   } catch (e) {
     return cwr.errorWebResp(res, 500, `E0000 - ipfsNetwork`, e.message);

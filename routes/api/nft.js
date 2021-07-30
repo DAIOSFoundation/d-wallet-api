@@ -61,6 +61,7 @@ router.post(
   mw.upload.fields([
     {name: 'nftOriginal', maxCount: 1},
     {name: 'nftThumbnail', maxCount: 1},
+    {name: 'nftThumbnailImage', maxCount: 1},
     {name: 'bioOriginal', maxCount: 1},
     {name: 'bioThumbnail', maxCount: 1},
     {name: 'nftPenProfileImage', maxCount: 1},
