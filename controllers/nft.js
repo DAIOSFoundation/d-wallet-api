@@ -338,27 +338,27 @@ const postUploadAll = async (req, res) => {
       'nftThumbnail',
       'nftThumbnailImage',
       'bioOriginal',
-      'bioThumbnail',
+      //      'bioThumbnail',
       'variation',
-      'variationThumbnail',
-      'nftPenProfileImage',
+      //      'variationThumbnail',
+      //      'nftPenProfileImage',
     ];
     const paths = [
       req.nodeFilePath,
       req.nodeFilePath,
       req.nodeFilePath,
       req.nodeBioPath,
-      req.nodeBioPath,
+      //      req.nodeBioPath,
       req.nodeFilePath,
-      req.nodeFilePath,
-      req.nodeFilePath,
+      //      req.nodeFilePath,
+      //      req.nodeFilePath,
     ];
     for (const field in fields) {
       const fieldHash = [];
       const fieldResult = [];
       for (const data in req.files[fields[field]]) {
         const rawFile = await readFile(
-          req.tmpDirectory + req.uploadFileName[0],
+          req.tmpDirectory + req.uploadFileName[field],
         );
         const result = await addFileOnIPFS(
           req,
