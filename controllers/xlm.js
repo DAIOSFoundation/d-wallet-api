@@ -159,6 +159,55 @@ const postAccount = async (req, res) => {
 const postAccountSponsor = async (req, res) => {
   try {
     const {sponsoredSecret, sponsorSecret, startingBalance} = req.body;
+    const {server, txOptions} = req;
+
+    // Accounts
+    const sponsoredAccount = StellarSdk.Keypair.fromSecret(sponsoredSecret);
+    const sponsorAccount = StellarSdk.Keypair.fromSecret(sponsorSecret);
+
+    const loadedSponsorAccount = await server.loadAccount(
+      sponsorAccount.publicKey(),
+    );
+
+    const transaction = new StellarSdk.TransactionBuilder(
+      loadedSponsorAccount,
+      txOptions,
+    )
+      .addOperation(
+        StellarSdk.Operation.beginSponsoringFutureReserves({
+          source: sponsorAccount.publicKey(), // reserve Sponsor
+          sponsoredId: sponsoredAccount.publicKey(), // receive Sponsor
+        }),
+      )
+      .addOperation(
+        StellarSdk.Operation.createAccount({
+          destination: sponsoredAccount.publicKey(),
+          startingBalance: startingBalance || '0',
+        }),
+      )
+      .addOperation(
+        StellarSdk.Operation.endSponsoringFutureReserves({
+          source: sponsoredAccount.publicKey(),
+        }),
+      )
+      .setTimeout(180)
+      .build();
+    transaction.sign(sponsoredAccount, sponsorAccount);
+    const txResponse = await server.submitTransaction(transaction);
+    return cwr.createWebResp(res, 200, txResponse);
+  } catch (e) {
+    return cwr.errorWebResp(
+      res,
+      500,
+      `E0000 - postAccountSponsor`,
+      xlmUtils.parseOperationError(e),
+    );
+  }
+};
+
+const postAccountAssetSponsor = async (req, res) => {
+  try {
+    const {sponsoredSecret, sponsorSecret, startingBalance} = req.body;
     const {server, txOptions, asset} = req;
 
     // Accounts
@@ -204,7 +253,7 @@ const postAccountSponsor = async (req, res) => {
     return cwr.errorWebResp(
       res,
       500,
-      `E0000 - postAccountSponsor`,
+      `E0000 - postAccountAssetSponsor`,
       xlmUtils.parseOperationError(e),
     );
   }
@@ -769,6 +818,7 @@ module.exports = {
   getAccountDetail,
   postAccount,
   postAccountSponsor,
+  postAccountAssetSponsor,
   postPayment,
   postPaymentSponsor,
   postTrustAsset,

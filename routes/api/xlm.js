@@ -37,11 +37,14 @@ router.get('/accountDetail', mw.xlmNetwork, xlmController.getAccountDetail);
 router.post('/account', mw.xlmNetwork, xlmController.postAccount);
 
 // Create Account from Sponsor
+router.post('/accountSponsor', mw.xlmNetwork, xlmController.postAccountSponsor);
+
+// Create Account with asset from Sponsor
 router.post(
-  '/accountSponsor',
+  '/accountAssetSponsor',
   mw.xlmNetwork,
   mw.xlmAsset,
-  xlmController.postAccountSponsor,
+  xlmController.postAccountAssetSponsor,
 );
 
 // 트랜잭션 전송, 금액의 지불
