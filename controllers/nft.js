@@ -337,20 +337,20 @@ const postUploadAll = async (req, res) => {
       'nftOriginal',
       'nftThumbnail',
       'nftThumbnailImage',
+      'nftPenProfileImage',
       'bioOriginal',
       //      'bioThumbnail',
-      'variation',
+      // 'variation',
       //      'variationThumbnail',
-      //      'nftPenProfileImage',
     ];
     const paths = [
       req.nodeFilePath,
       req.nodeFilePath,
       req.nodeFilePath,
+      req.nodeFilePath,
       req.nodeBioPath,
       //      req.nodeBioPath,
-      req.nodeFilePath,
-      //      req.nodeFilePath,
+      // req.nodeFilePath,
       //      req.nodeFilePath,
     ];
     for (const field in fields) {
