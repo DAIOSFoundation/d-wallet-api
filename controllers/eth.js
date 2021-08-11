@@ -301,8 +301,8 @@ const getGasPrice = async (req, res) => {
     for (const chunk of chunkedLinks) {
       const resolvedProducts = await Promise.all(chunk);
       resolvedProducts.forEach((product) => {
-          txsGas.push(product.gasPrice);
-          txLength += 1;
+        txsGas.push(product.gasPrice);
+        txLength += 1;
       });
     }
     const sumGas = txsGas.reduce((a, b) => parseInt(a) + parseInt(b), 0);

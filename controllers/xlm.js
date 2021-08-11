@@ -808,6 +808,169 @@ const postNFT = async (req, res) => {
   }
 };
 
+const getOrderBook = async (req, res) => {
+  try {
+    const {selling_asset_issuer, selling_asset_code, publicKey} = req.query;
+    const {server} = req;
+    let result;
+    if (publicKey) {
+      result = await server.offers().forAccount(publicKey).call();
+    } else if (selling_asset_code && selling_asset_issuer) {
+      const asset = new StellarSdk.Asset(
+        selling_asset_code,
+        selling_asset_issuer,
+      );
+      result = await server.offers().selling(asset).call();
+    }
+    const data = [];
+    if (result.records) {
+      for (const item in result.records) {
+        data.push({
+          offerId: result.records[item].id,
+          code: `${result.records[item].selling.asset_code}/${
+            result.records[item].buying.asset_code
+              ? result.records[item].buying.asset_code
+              : 'XLM'
+          }`,
+          issuer: `${result.records[item].selling.asset_issuer}/${
+            result.records[item].buying.asset_issuer
+              ? result.records[item].buying.asset_issuer
+              : 'XLM'
+          }`,
+          price: `${result.records[item].amount}/${result.records[item].price}`,
+          sellerPublic: result.records[item].seller,
+          link: result.records[item]._links.self.href,
+        });
+      }
+    }
+    return cwr.createWebResp(res, 200, {data, result:result?.records});
+  } catch (e) {
+    return cwr.errorWebResp(
+      res,
+      500,
+      `E0000 - getOrderBook`,
+      xlmUtils.parseOperationError(e),
+    );
+  }
+};
+
+const postSellOffer = async (req, res) => {
+  try {
+    const {server, txOptions} = req;
+    const {
+      secret,
+      amount,
+      price,
+      offerId,
+      sellingCode,
+      sellingIssuer,
+      buyingCode,
+      buyingIssuer,
+    } = req.body;
+
+    const Account = StellarSdk.Keypair.fromSecret(secret);
+    const loadedAccount = await server.loadAccount(Account.publicKey());
+    for (const token in loadedAccount?.balances) {
+      if (loadedAccount?.balances[token]?.asset_issuer === sellingIssuer) {
+        if (loadedAccount?.balances[token]?.balance < amount) {
+          return cwr.errorWebResp(
+            res,
+            500,
+            `E0000 - postSellOffer`,
+            "You don't have enough amount.",
+          );
+        }
+      }
+    }
+    let transaction = new StellarSdk.TransactionBuilder(
+      loadedAccount,
+      txOptions,
+    );
+    if (buyingCode !== 'XLM') {
+      transaction = transaction.addOperation(
+        StellarSdk.Operation.changeTrust({
+          asset: new StellarSdk.Asset(buyingCode, buyingIssuer),
+        }),
+      );
+    }
+    transaction = transaction
+      .addOperation(
+        StellarSdk.Operation.manageSellOffer({
+          selling: new StellarSdk.Asset(sellingCode, sellingIssuer),
+          buying: new StellarSdk.Asset(buyingCode, buyingIssuer),
+          amount,
+          price,
+          offerId,
+        }),
+      )
+      .setTimeout(xlmUtils.TIMEOUT)
+      .build();
+    transaction.sign(Account);
+    const txResponse = await server.submitTransaction(transaction);
+    return cwr.createWebResp(res, 200, {
+      result: !!txResponse?.offerResults,
+      txResponse,
+    });
+  } catch (e) {
+    return cwr.errorWebResp(
+      res,
+      500,
+      `E0000 - postSellOffer`,
+      xlmUtils.parseOperationError(e),
+    );
+  }
+};
+
+const postBuyOffer = async (req, res) => {
+  try {
+    const {server, txOptions} = req;
+    const {
+      secret,
+      buyAmount,
+      price,
+      sellingCode,
+      sellingIssuer,
+      buyingCode,
+      buyingIssuer,
+    } = req.body;
+
+    const Account = StellarSdk.Keypair.fromSecret(secret);
+    const loadedAccount = await server.loadAccount(Account.publicKey());
+    const transaction = new StellarSdk.TransactionBuilder(
+      loadedAccount,
+      txOptions,
+    )
+      .addOperation(
+        StellarSdk.Operation.changeTrust({
+          asset: new StellarSdk.Asset(buyingCode, buyingIssuer),
+        }),
+      )
+      .addOperation(
+        StellarSdk.Operation.manageBuyOffer({
+          selling: new StellarSdk.Asset(sellingCode, sellingIssuer),
+          buying: new StellarSdk.Asset(buyingCode, buyingIssuer),
+          buyAmount,
+          price,
+        }),
+      )
+      .setTimeout(xlmUtils.TIMEOUT)
+      .build();
+    transaction.sign(Account);
+    const txResponse = await server.submitTransaction(transaction);
+    return cwr.createWebResp(res, 200, {
+      result: !!txResponse?.offerResults,
+      txResponse,
+    });
+  } catch (e) {
+    return cwr.errorWebResp(
+      res,
+      500,
+      `E0000 - postBuyOffer`,
+      xlmUtils.parseOperationError(e),
+    );
+  }
+};
+
 module.exports = {
   postKey,
   getFeeStats,
@@ -834,4 +997,7 @@ module.exports = {
   postAccountMerge,
   getMinimumBalance,
   postNFT,
+  postSellOffer,
+  postBuyOffer,
+  getOrderBook,
 };

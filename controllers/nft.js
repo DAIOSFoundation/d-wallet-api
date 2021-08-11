@@ -426,7 +426,7 @@ const getIpfs = async (req, res) => {
         path: file.path,
         name: file.name,
         type: file.type,
-        codec: file.cid.codec,
+        // codec: file.cid.codec,
       });
     }
     if (files.length === 1) {

@@ -141,4 +141,10 @@ router.get('/minimumBalance', mw.xlmNetwork, xlmController.getMinimumBalance);
 // Mint NFT
 router.post('/nft', mw.xlmNetwork, xlmController.postNFT);
 
+router.post('/sellOffer', mw.xlmNetwork, xlmController.postSellOffer);
+
+router.post('/buyOffer', mw.xlmNetwork, xlmController.postBuyOffer);
+
+router.get('/orderBook', mw.xlmNetwork, xlmController.getOrderBook);
+
 module.exports = router;
