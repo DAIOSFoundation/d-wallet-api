@@ -56,6 +56,21 @@ router.post(
   xlmController.postPayment,
 );
 
+// 트랜잭션 전송 봉투 (Asset Token)
+router.post(
+  '/paymentEnvelope',
+  mw.xlmNetwork,
+  mw.xlmAsset,
+  xlmController.postPaymentEnvelope,
+);
+
+// 트랜잭션 전송 봉투 서명
+router.post(
+  '/paymentEnvelopeSign',
+  mw.xlmNetwork,
+  xlmController.postPaymentEnvelopeSign,
+);
+
 // 트랜잭션 전송, Sponsor
 router.post(
   '/paymentSponsor',

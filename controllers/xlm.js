@@ -293,6 +293,71 @@ const postPayment = async (req, res) => {
   }
 };
 
+const postPaymentEnvelope = async (req, res) => {
+  try {
+    const {toAddress, secretKey, amount, memo, maxTime} = req.body;
+    const {asset, server, txOptions} = req;
+    const keypair = StellarSdk.Keypair.fromSecret(secretKey);
+    const fromAddress = keypair.publicKey();
+    const loadedAccount = await server.loadAccount(fromAddress);
+    const transaction = new StellarSdk.TransactionBuilder(
+      loadedAccount,
+      txOptions,
+    )
+      .addOperation(
+        StellarSdk.Operation.changeTrust({
+          source: toAddress,
+          asset,
+        }),
+      )
+      .addOperation(
+        StellarSdk.Operation.payment({
+          destination: toAddress,
+          asset,
+          amount: amount.toString(),
+        }),
+      )
+      .addMemo(memo ? StellarSdk.Memo.text(memo) : StellarSdk.Memo.none())
+      .setTimeout(maxTime || xlmUtils.TIMEOUT)
+      .build();
+    transaction.sign(keypair);
+    const signedTx = transaction.toEnvelope().toXDR('base64');
+    return cwr.createWebResp(res, 200, {XDR: signedTx});
+  } catch (e) {
+    return cwr.errorWebResp(
+      res,
+      500,
+      `E0000 - postPaymentEnvelope`,
+      xlmUtils.parseOperationError(e),
+    );
+  }
+};
+
+const postPaymentEnvelopeSign = async (req, res) => {
+  try {
+    const {network, XDR, secretKey} = req.body;
+    const {server} = req;
+    const keypair = StellarSdk.Keypair.fromSecret(secretKey);
+
+    const transaction = new StellarSdk.Transaction(
+      XDR,
+      network === 'PUBLIC'
+        ? StellarSdk.Networks.PUBLIC
+        : StellarSdk.Networks.TESTNET,
+    );
+    transaction.sign(keypair);
+    const resp = await server.submitTransaction(transaction);
+    return cwr.createWebResp(res, 200, resp);
+  } catch (e) {
+    return cwr.errorWebResp(
+      res,
+      500,
+      `E0000 - postPaymentEnvelopeSign`,
+      xlmUtils.parseOperationError(e),
+    );
+  }
+};
+
 const postPaymentSponsor = async (req, res) => {
   try {
     const {toAddress, amount, memo, maxTime, secretKey, sponsorSecret} =
@@ -843,7 +908,7 @@ const getOrderBook = async (req, res) => {
         });
       }
     }
-    return cwr.createWebResp(res, 200, {data, result:result?.records});
+    return cwr.createWebResp(res, 200, {data, result: result?.records});
   } catch (e) {
     return cwr.errorWebResp(
       res,
@@ -983,6 +1048,8 @@ module.exports = {
   postAccountSponsor,
   postAccountAssetSponsor,
   postPayment,
+  postPaymentEnvelope,
+  postPaymentEnvelopeSign,
   postPaymentSponsor,
   postTrustAsset,
   postTrustAssetSponsor,
