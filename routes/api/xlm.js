@@ -143,7 +143,6 @@ router.post('/manageData', mw.xlmNetwork, xlmController.postManageData);
 // decodeXDR
 router.post(
   '/decodeEnvelopeXDR',
-  mw.xlmNetwork,
   xlmController.postDecodeEnvelopeXDR,
 );
 

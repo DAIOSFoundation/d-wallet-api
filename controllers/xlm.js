@@ -1,6 +1,7 @@
 const StellarSdk = require('stellar-sdk');
 const StellarHDWallet = require('stellar-hd-wallet');
 const axios = require('axios');
+const {parse} = require('xdr-parser');
 const cwr = require('../utils/createWebResp');
 const xlmUtils = require('../utils/xlm/utils');
 const {ipfsUtils} = require('../utils/ipfs/ipfsUtils');
@@ -691,15 +692,17 @@ const postDecodeEnvelopeXDR = async (req, res) => {
   try {
     // Reference from
     // https://github.com/stellar/js-stellar-sdk/tree/master/docs/reference#handling-responses
-    const {envelopeXDR} = req.body;
-    const {networkPassphrase} = req;
+    // const {envelopeXDR} = req.body;
+    // const {networkPassphrase} = req;
     // const result = StellarSdk.xdr.TransactionEnvelope.fromXDR(envelopeXDR, 'base64')
     // return cwr.createWebResp(res, 200, result);
-    const transaction = new StellarSdk.Transaction(
-      envelopeXDR,
-      networkPassphrase,
-    );
-    return cwr.createWebResp(res, 200, transaction);
+    // const transaction = new StellarSdk.Transaction(
+    //   envelopeXDR,
+    //   networkPassphrase,
+    // );
+    const {XDR} = req.body;
+    const obj = parse(XDR);
+    return cwr.createWebResp(res, 200, obj);
   } catch (e) {
     return cwr.errorWebResp(
       res,
