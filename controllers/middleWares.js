@@ -181,7 +181,7 @@ const btcNetwork = async (req, res, next) => {
     // network param must be 'bitcoin' or 'mainnet'
     if (network === 'bitcoin' || network === 'mainnet') {
       client = new Client({
-        network,
+        network: 'mainnet',
         host: process.env.BTC_HOST,
         username: process.env.BTC_USERNAME,
         password: process.env.BTC_USER_PASSWORD,
