@@ -810,7 +810,7 @@ const postNFT = async (req, res) => {
 
 const getOrderBook = async (req, res) => {
   try {
-    const {selling_asset_issuer, selling_asset_code, publicKey} = req.query;
+    const {selling_asset_issuer, selling_asset_code, buying_asset_code, buying_asset_issuer, publicKey} = req.query;
     const {server} = req;
     let result;
     if (publicKey) {
@@ -821,18 +821,32 @@ const getOrderBook = async (req, res) => {
         selling_asset_issuer,
       );
       result = await server.offers().selling(asset).call();
+    } else if (buying_asset_code && buying_asset_issuer) {
+      const asset = new StellarSdk.Asset(
+        buying_asset_code,
+        buying_asset_issuer,
+      );
+      result = await server.offers().buying(asset).call();
     }
     const data = [];
     if (result.records) {
       for (const item in result.records) {
         data.push({
           offerId: result.records[item].id,
-          code: `${result.records[item].selling.asset_code}/${
+          code: `${
+            result.records[item].selling.asset_code
+              ? result.records[item].selling.asset_code
+              : 'XLM'
+          }/${
             result.records[item].buying.asset_code
               ? result.records[item].buying.asset_code
               : 'XLM'
           }`,
-          issuer: `${result.records[item].selling.asset_issuer}/${
+          issuer: `${
+            result.records[item].selling.asset_code
+              ? result.records[item].selling.asset_code
+              : 'XLM'
+          }/${
             result.records[item].buying.asset_issuer
               ? result.records[item].buying.asset_issuer
               : 'XLM'
@@ -936,16 +950,20 @@ const postBuyOffer = async (req, res) => {
 
     const Account = StellarSdk.Keypair.fromSecret(secret);
     const loadedAccount = await server.loadAccount(Account.publicKey());
-    const transaction = new StellarSdk.TransactionBuilder(
+    let transaction = new StellarSdk.TransactionBuilder(
       loadedAccount,
       txOptions,
     )
-      .addOperation(
+
+    if (buyingCode !== 'XLM') {
+      transaction = transaction.addOperation(
         StellarSdk.Operation.changeTrust({
           asset: new StellarSdk.Asset(buyingCode, buyingIssuer),
         }),
-      )
-      .addOperation(
+      );
+    }
+
+    transaction = transaction.addOperation(
         StellarSdk.Operation.manageBuyOffer({
           selling: new StellarSdk.Asset(sellingCode, sellingIssuer),
           buying: new StellarSdk.Asset(buyingCode, buyingIssuer),
