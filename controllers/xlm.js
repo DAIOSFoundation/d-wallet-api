@@ -1,6 +1,7 @@
 const StellarSdk = require('stellar-sdk');
 const StellarHDWallet = require('stellar-hd-wallet');
 const axios = require('axios');
+const {parse} = require('xdr-parser');
 const cwr = require('../utils/createWebResp');
 const xlmUtils = require('../utils/xlm/utils');
 const {ipfsUtils} = require('../utils/ipfs/ipfsUtils');
@@ -288,6 +289,71 @@ const postPayment = async (req, res) => {
       res,
       500,
       `E0000 - postPayment`,
+      xlmUtils.parseOperationError(e),
+    );
+  }
+};
+
+const postPaymentEnvelope = async (req, res) => {
+  try {
+    const {toAddress, secretKey, amount, memo, maxTime} = req.body;
+    const {asset, server, txOptions} = req;
+    const keypair = StellarSdk.Keypair.fromSecret(secretKey);
+    const fromAddress = keypair.publicKey();
+    const loadedAccount = await server.loadAccount(fromAddress);
+    const transaction = new StellarSdk.TransactionBuilder(
+      loadedAccount,
+      txOptions,
+    )
+      .addOperation(
+        StellarSdk.Operation.changeTrust({
+          source: toAddress,
+          asset,
+        }),
+      )
+      .addOperation(
+        StellarSdk.Operation.payment({
+          destination: toAddress,
+          asset,
+          amount: amount.toString(),
+        }),
+      )
+      .addMemo(memo ? StellarSdk.Memo.text(memo) : StellarSdk.Memo.none())
+      .setTimeout(maxTime || xlmUtils.TIMEOUT)
+      .build();
+    transaction.sign(keypair);
+    const signedTx = transaction.toEnvelope().toXDR('base64');
+    return cwr.createWebResp(res, 200, {XDR: signedTx});
+  } catch (e) {
+    return cwr.errorWebResp(
+      res,
+      500,
+      `E0000 - postPaymentEnvelope`,
+      xlmUtils.parseOperationError(e),
+    );
+  }
+};
+
+const postPaymentEnvelopeSign = async (req, res) => {
+  try {
+    const {network, XDR, secretKey} = req.body;
+    const {server} = req;
+    const keypair = StellarSdk.Keypair.fromSecret(secretKey);
+
+    const transaction = new StellarSdk.Transaction(
+      XDR,
+      network === 'PUBLIC'
+        ? StellarSdk.Networks.PUBLIC
+        : StellarSdk.Networks.TESTNET,
+    );
+    transaction.sign(keypair);
+    const resp = await server.submitTransaction(transaction);
+    return cwr.createWebResp(res, 200, resp);
+  } catch (e) {
+    return cwr.errorWebResp(
+      res,
+      500,
+      `E0000 - postPaymentEnvelopeSign`,
       xlmUtils.parseOperationError(e),
     );
   }
@@ -626,15 +692,17 @@ const postDecodeEnvelopeXDR = async (req, res) => {
   try {
     // Reference from
     // https://github.com/stellar/js-stellar-sdk/tree/master/docs/reference#handling-responses
-    const {envelopeXDR} = req.body;
-    const {networkPassphrase} = req;
+    // const {envelopeXDR} = req.body;
+    // const {networkPassphrase} = req;
     // const result = StellarSdk.xdr.TransactionEnvelope.fromXDR(envelopeXDR, 'base64')
     // return cwr.createWebResp(res, 200, result);
-    const transaction = new StellarSdk.Transaction(
-      envelopeXDR,
-      networkPassphrase,
-    );
-    return cwr.createWebResp(res, 200, transaction);
+    // const transaction = new StellarSdk.Transaction(
+    //   envelopeXDR,
+    //   networkPassphrase,
+    // );
+    const {XDR} = req.body;
+    const obj = parse(XDR);
+    return cwr.createWebResp(res, 200, obj);
   } catch (e) {
     return cwr.errorWebResp(
       res,
@@ -857,7 +925,7 @@ const getOrderBook = async (req, res) => {
         });
       }
     }
-    return cwr.createWebResp(res, 200, {data, result:result?.records});
+    return cwr.createWebResp(res, 200, {data, result: result?.records});
   } catch (e) {
     return cwr.errorWebResp(
       res,
@@ -1001,6 +1069,8 @@ module.exports = {
   postAccountSponsor,
   postAccountAssetSponsor,
   postPayment,
+  postPaymentEnvelope,
+  postPaymentEnvelopeSign,
   postPaymentSponsor,
   postTrustAsset,
   postTrustAssetSponsor,

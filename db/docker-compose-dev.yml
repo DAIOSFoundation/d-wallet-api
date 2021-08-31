@@ -1,7 +1,7 @@
 version: '3.8'
 services:
   d-wallet-db-dev:
-    image: mongo:4.4.6-bionic
+    image: mongo:5.0.2-focal
     container_name: d-wallet-db-dev
     restart: always
     env_file: .env

@@ -3,11 +3,11 @@ const winston = require('../../config/winston');
 
 const mongooseConnect = async () => {
   try {
-    const DB_URI = `mongodb://${process.env.MONGO_DB_URL}/${process.env.MONGO_DB_NAME}`;
+    const DB_URI = `mongodb://${process.env.MONGO_DB_USER}:${process.env.MONGO_DB_PASSWORD}@${process.env.MONGO_DB_URL}/${process.env.MONGO_DB_NAME}`;
     winston.log.info(`DB URI : ${DB_URI}`);
     await mongoose.connect(DB_URI, {
-      user: process.env.MONGO_DB_USER,
-      pass: process.env.MONGO_DB_PASSWORD,
+      // user: process.env.MONGO_DB_USER,
+      // pass: process.env.MONGO_DB_PASSWORD,
       useUnifiedTopology: true,
       useNewUrlParser: true,
       useCreateIndex: true,
