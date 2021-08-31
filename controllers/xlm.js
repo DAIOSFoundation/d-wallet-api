@@ -878,7 +878,13 @@ const postNFT = async (req, res) => {
 
 const getOrderBook = async (req, res) => {
   try {
-    const {selling_asset_issuer, selling_asset_code, buying_asset_code, buying_asset_issuer, publicKey} = req.query;
+    const {
+      selling_asset_issuer,
+      selling_asset_code,
+      buying_asset_code,
+      buying_asset_issuer,
+      publicKey,
+    } = req.query;
     const {server} = req;
     let result;
     if (publicKey) {
@@ -1021,7 +1027,7 @@ const postBuyOffer = async (req, res) => {
     let transaction = new StellarSdk.TransactionBuilder(
       loadedAccount,
       txOptions,
-    )
+    );
 
     if (buyingCode !== 'XLM') {
       transaction = transaction.addOperation(
@@ -1031,7 +1037,8 @@ const postBuyOffer = async (req, res) => {
       );
     }
 
-    transaction = transaction.addOperation(
+    transaction = transaction
+      .addOperation(
         StellarSdk.Operation.manageBuyOffer({
           selling: new StellarSdk.Asset(sellingCode, sellingIssuer),
           buying: new StellarSdk.Asset(buyingCode, buyingIssuer),

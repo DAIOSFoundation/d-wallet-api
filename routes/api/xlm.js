@@ -141,10 +141,7 @@ router.post(
 router.post('/manageData', mw.xlmNetwork, xlmController.postManageData);
 
 // decodeXDR
-router.post(
-  '/decodeEnvelopeXDR',
-  xlmController.postDecodeEnvelopeXDR,
-);
+router.post('/decodeEnvelopeXDR', xlmController.postDecodeEnvelopeXDR);
 
 // accountMerge
 router.post('/accountMerge', mw.xlmNetwork, xlmController.postAccountMerge);

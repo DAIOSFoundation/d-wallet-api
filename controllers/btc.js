@@ -116,9 +116,11 @@ const postCreateWallet = async (req, res) => {
     if (network === 'mainnet') {
       response = await client.createWallet(`wallets/${walletName}`);
     } else if (network === 'regtest') {
-      response = await client.createWallet(`regtest/${walletName}`);
+      response = await client.createWallet(`${walletName}`);
     } else if (network === 'testnet') {
-      response = await client.createWallet(`testnet/${walletName}`);
+      response = await client.createWallet(`${walletName}`);
+    } else if (network === 'signet') {
+      response = await client.createWallet(`${walletName}`);
     }
     return cwr.createWebResp(res, 200, {...response});
   } catch (e) {
