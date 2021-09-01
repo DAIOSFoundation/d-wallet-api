@@ -9,7 +9,7 @@ const postDecodeMnemonic = async (req, res) => {
     const seed = bip39.mnemonicToSeedSync(mnemonic);
     let bitcoinNetwork;
     let path;
-    if (network === 'bitcoin') {
+    if (network === 'bitcoin' || network === 'mainnet') {
       bitcoinNetwork = bitcoin.networks.bitcoin;
       path = `m/44'/0'/0'/0/${index}`;
     } else {
@@ -27,9 +27,15 @@ const postDecodeMnemonic = async (req, res) => {
       pubkey: keyPair.publicKey,
       network: bitcoinNetwork,
     });
-    const privateKey = keyPair.toWIF();
-    // const privateKey = keyPair.privateKey.toString('hex').toString('base64');
-    return cwr.createWebResp(res, 200, {address, privateKey, path});
+    const WIF = keyPair.toWIF();
+    const privateHex = keyPair.privateKey.toString('hex').toString('base64');
+    return cwr.createWebResp(res, 200, {
+      address,
+      network,
+      WIF,
+      privateHex,
+      path,
+    });
   } catch (e) {
     return cwr.errorWebResp(res, 500, 'E0000 - postDecodeMnemonic', e.message);
   }
@@ -37,20 +43,31 @@ const postDecodeMnemonic = async (req, res) => {
 
 const postDecodeWIF = async (req, res) => {
   try {
-    const {privateKey} = req.body;
-    const keyPair = bitcoin.ECPair.fromWIF(privateKey);
+    const {privateKey, network} = req.body;
+    let bitcoinNetwork;
+    if (network === 'bitcoin' || network === 'mainnet') {
+      bitcoinNetwork = bitcoin.networks.bitcoin;
+    } else if (network === 'testnet') {
+      bitcoinNetwork = bitcoin.networks.testnet;
+    } else if (network === 'regtest') {
+      bitcoinNetwork = bitcoin.networks.regtest;
+    } else {
+      return cwr.errorWebResp(res, 500, 'E0000 - Invalid BTC Network');
+    }
+    const keyPair = bitcoin.ECPair.fromWIF(privateKey, bitcoinNetwork);
     const {address: p2shPublicAddress} = bitcoin.payments.p2sh({
       redeem: bitcoin.payments.p2wpkh({
         pubkey: keyPair.publicKey,
-        network: bitcoin.networks.bitcoin,
+        network: bitcoinNetwork,
       }),
     });
     const {address: p2pkhPublicAddress} = bitcoin.payments.p2pkh({
       pubkey: keyPair.publicKey,
-      network: bitcoin.networks.bitcoin,
+      network: bitcoinNetwork,
     });
 
     const data = {
+      network,
       p2sh: {
         address: p2shPublicAddress,
       },
