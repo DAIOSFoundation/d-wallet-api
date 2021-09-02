@@ -169,6 +169,18 @@ const getBalance = async (req, res) => {
   }
 };
 
+const getFees = async (req, res) => {
+  try {
+    const response = await axios.get(
+      'https://bitcoinfees.earn.com/api/v1/fees/recommended',
+    );
+    const {data} = response;
+    return cwr.createWebResp(res, 200, {...data});
+  } catch (e) {
+    return cwr.errorWebResp(res, 500, 'E0000 - getFees', e.message);
+  }
+};
+
 const getAddressInfo = async (req, res) => {
   try {
     const {client} = req;
@@ -232,6 +244,7 @@ module.exports = {
   getNetworkInfo,
   postCreateWallet,
   getBalance,
+  getFees,
   getAddressInfo,
   postLoadWallet,
   postUnloadWallet,
