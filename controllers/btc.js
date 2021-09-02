@@ -29,7 +29,18 @@ const postDecodeMnemonic = async (req, res) => {
     });
     const privateKey = keyPair.toWIF();
     // const privateKey = keyPair.privateKey.toString('hex').toString('base64');
-    return cwr.createWebResp(res, 200, {address, privateKey, path});
+    const seedHDwallet = hdMaster.toWIF();
+    const BIP39seed = seed.toString('hex');
+    const node = bitcoin.bip32.fromSeed(seed);
+    const xpriv = node.toBase58();
+    //const xpub = node.neutered().toBase58(); // ???
+    const rootKey = {
+      BIP39seed,
+      BIP32RootKey: xpriv,
+      seedHDwallet
+      //xpub,
+    };
+    return cwr.createWebResp(res, 200, {rootKey, address, privateKey, path});
   } catch (e) {
     return cwr.errorWebResp(res, 500, 'E0000 - postDecodeMnemonic', e.message);
   }
@@ -114,7 +125,7 @@ const postCreateWallet = async (req, res) => {
     let response;
     // mainnet doesn't make wallet in .bitcoin/wallets
     if (network === 'mainnet') {
-      response = await client.createWallet(`wallets/${walletName}`);
+      response = await client.createWallet(`${walletName}`);
     } else if (network === 'regtest') {
       response = await client.createWallet(`${walletName}`);
     } else if (network === 'testnet') {
@@ -198,11 +209,45 @@ const getWalletInfo = async (req, res) => {
 const postDumpPrivKey = async (req, res) => {
   try {
     const {client} = req;
-    const {walletName} = req.body;
-    const result = await client.dumpPrivKey(walletName);
+    const {address} = req.body;
+    const result = await client.dumpPrivKey(address);
     return cwr.createWebResp(res, 200, {...result});
   } catch (e) {
     return cwr.errorWebResp(res, 500, 'E0000 - postDumpPrivKey', e.message);
+  }
+};
+
+const postDumpWallet = async (req, res) => {
+  try {
+    const {client} = req;
+    const {walletName, network} = req.body;
+    const path = "/home/bitcoin/.bitcoin/" + (network === "mainnet" ? "" : (network + "/")) + 'wallets/' + walletName + '/' + walletName + '.dat';
+    const result = await client.dumpWallet(path);
+    return cwr.createWebResp(res, 200, {...result});
+  } catch (e) {
+    return cwr.errorWebResp(res, 500, 'E0000 - postDumpWallet', e.message);
+  }
+};
+
+const postImportprivkey = async (req, res) => {
+  try {
+    const {client} = req;
+    const {privkey, label, rescan} = req.body;
+    const result = await client.importPrivKey(privkey, label, !!rescan);
+    return cwr.createWebResp(res, 200, {...result});
+  } catch (e) {
+    return cwr.errorWebResp(res, 500, 'E0000 - postImportprivkey', e.message);
+  }
+};
+
+const postSethdseed = async (req, res) => {
+  try {
+    const {client} = req;
+    const {newkeypool, seed} = req.body;
+    const result = await client.setHdSeed(newkeypool, seed);
+    return cwr.createWebResp(res, 200, {...result});
+  } catch (e) {
+    return cwr.errorWebResp(res, 500, 'E0000 - postSethdseed', e.message);
   }
 };
 
@@ -220,4 +265,7 @@ module.exports = {
   postUnloadWallet,
   getWalletInfo,
   postDumpPrivKey,
+  postDumpWallet,
+  postImportprivkey,
+  postSethdseed,
 };

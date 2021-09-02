@@ -44,4 +44,10 @@ router.get('/walletInfo', mw.btcNetwork, btcController.getWalletInfo);
 
 router.post('/dumpPrivKey', mw.btcNetwork, btcController.postDumpPrivKey);
 
+router.post('/dumpWallet', mw.btcNetwork, btcController.postDumpWallet);
+
+router.post('/importprivkey', mw.btcNetwork, btcController.postImportprivkey);
+
+router.post('/sethdseed', mw.btcNetwork, btcController.postSethdseed);
+
 module.exports = router;
