@@ -34,6 +34,12 @@ router.post('/createWallet', mw.btcNetwork, btcController.postCreateWallet);
 // With blockchain.info API
 router.get('/balance', btcController.getBalance);
 
+// With bitcoinfees.earn.com
+router.get(
+  '/fees',
+  btcController.getFees,
+)
+
 router.get('/addressInfo', mw.btcNetwork, btcController.getAddressInfo);
 
 router.post('/loadWallet', mw.btcNetwork, btcController.postLoadWallet);
