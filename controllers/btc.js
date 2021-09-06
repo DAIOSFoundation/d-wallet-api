@@ -27,7 +27,6 @@ const postDecodeMnemonic = async (req, res) => {
       pubkey: keyPair.publicKey,
       network: bitcoinNetwork,
     });
-    const privateKey = keyPair.toWIF();
     // const privateKey = keyPair.privateKey.toString('hex').toString('base64');
     const seedHDwallet = hdMaster.toWIF();
     const BIP39seed = seed.toString('hex');
@@ -45,7 +44,7 @@ const postDecodeMnemonic = async (req, res) => {
       seedHDwallet
       //xpub,
     };
-    return cwr.createWebResp(res, 200, {rootKey, WIF, privateHex, address, privateKey, path});
+    return cwr.createWebResp(res, 200, {rootKey, WIF, privateHex, address, path});
   } catch (e) {
     return cwr.errorWebResp(res, 500, 'E0000 - postDecodeMnemonic', e.message);
   }
@@ -139,7 +138,6 @@ const postCreateWallet = async (req, res) => {
     const {network, client} = req;
     const {walletName} = req.body;
     let response;
-    // mainnet doesn't make wallet in .bitcoin/wallets
     if (network === 'mainnet') {
       response = await client.createWallet(`${walletName}`);
     } else if (network === 'regtest') {

@@ -7,7 +7,7 @@ const {
   isExist,
   addFileOnIPFS,
 } = require('../services/nft');
-const {ipfsUtils} = require('../utils/ipfs/ipfsUtils');
+const {IPFSUtils} = require('../utils/ipfs/IPFSUtils');
 
 const postUploadMetadata = async (req, res) => {
   try {
@@ -286,7 +286,7 @@ const getAccountDetailForNFT = async (req, res) => {
             for (const key in response?.data) {
               if (
                 typeof response?.data[key] === 'string' &&
-                ipfsUtils.validator(response?.data[key])
+                IPFSUtils.validator(response?.data[key])
               ) {
                 for await (const file of req.ipfs.ls(response?.data[key])) {
                   data[`${key}Image`] = file.path;
@@ -509,7 +509,7 @@ const getAsset = async (req, res) => {
     for (const key in data.metadata) {
       if (
         typeof data.metadata[key] === 'string' &&
-        ipfsUtils.validator(data.metadata[key])
+        IPFSUtils.validator(data.metadata[key])
       ) {
         for await (const file of req.ipfs.ls(data.metadata[key])) {
           data[`${key}Image`] = file.path;
