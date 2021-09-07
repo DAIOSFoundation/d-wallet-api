@@ -4,7 +4,7 @@ const axios = require('axios');
 const {parse} = require('xdr-parser');
 const cwr = require('../utils/createWebResp');
 const xlmUtils = require('../utils/xlm/utils');
-const {ipfsUtils} = require('../utils/ipfs/ipfsUtils');
+const {IPFSUtils} = require('../utils/ipfs/IPFSUtils');
 
 const postKey = async (req, res) => {
   try {
@@ -781,7 +781,7 @@ const postNFT = async (req, res) => {
     const {server, txOptions} = req;
     const {nftReceiverSecret, sponsorSecret, nftName, nftAmount, ipfsHash} =
       req.body;
-    if (!ipfsUtils.validator(ipfsHash)) {
+    if (!IPFSUtils.validator(ipfsHash)) {
       return cwr.errorWebResp(
         res,
         403,
