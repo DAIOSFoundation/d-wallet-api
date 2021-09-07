@@ -35,10 +35,7 @@ router.post('/createWallet', mw.btcNetwork, btcController.postCreateWallet);
 router.get('/balance', btcController.getBalance);
 
 // With bitcoinfees.earn.com
-router.get(
-  '/fees',
-  btcController.getFees,
-)
+router.get('/fees', btcController.getFees);
 
 router.get('/addressInfo', mw.btcNetwork, btcController.getAddressInfo);
 
@@ -56,5 +53,5 @@ router.post('/importprivkey', mw.btcNetwork, btcController.postImportprivkey);
 
 router.post('/sethdseed', mw.btcNetwork, btcController.postSethdseed);
 
-router.get(  '/address', mw.btcNetwork,  btcController.getAddress)
+router.get('/address', mw.btcNetwork, btcController.getAddress);
 module.exports = router;

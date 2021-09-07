@@ -32,19 +32,24 @@ const postDecodeMnemonic = async (req, res) => {
     const BIP39seed = seed.toString('hex');
     const node = bitcoin.bip32.fromSeed(seed);
     const xpriv = node.toBase58();
-    //const xpub = node.neutered().toBase58(); // ???
+    // const xpub = node.neutered().toBase58(); // ???
 
     const WIF = keyPair.toWIF();
     const privateHex = keyPair.privateKey.toString('hex').toString('base64');
 
-
     const rootKey = {
       BIP39seed,
       BIP32RootKey: xpriv,
-      seedHDwallet
-      //xpub,
+      seedHDwallet,
+      // xpub,
     };
-    return cwr.createWebResp(res, 200, {rootKey, WIF, privateHex, address, path});
+    return cwr.createWebResp(res, 200, {
+      rootKey,
+      WIF,
+      privateHex,
+      address,
+      path,
+    });
   } catch (e) {
     return cwr.errorWebResp(res, 500, 'E0000 - postDecodeMnemonic', e.message);
   }
@@ -247,7 +252,9 @@ const postDumpWallet = async (req, res) => {
   try {
     const {client} = req;
     const {walletName, network} = req.body;
-    const path = "/home/bitcoin/.bitcoin/" + (network === "mainnet" ? "" : (network + "/")) + 'wallets/' + walletName + '/' + walletName + '.dat';
+    const path = `/home/bitcoin/.bitcoin/${
+      network === 'mainnet' ? '' : `${network}/`
+    }wallets/${walletName}/${walletName}.dat`;
     const result = await client.dumpWallet(path);
     return cwr.createWebResp(res, 200, {...result});
   } catch (e) {
@@ -281,7 +288,7 @@ const getAddress = async (req, res) => {
   try {
     const {client} = req;
     const result = await client.getNewAddress();
-    const address = result.toString("hex");
+    const address = result.toString('hex');
     return cwr.createWebResp(res, 200, {address});
   } catch (e) {
     return cwr.errorWebResp(res, 500, 'E0000 - getAddress', e.message);
