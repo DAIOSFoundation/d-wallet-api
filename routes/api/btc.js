@@ -56,4 +56,5 @@ router.post('/importprivkey', mw.btcNetwork, btcController.postImportprivkey);
 
 router.post('/sethdseed', mw.btcNetwork, btcController.postSethdseed);
 
+router.get(  '/address', mw.btcNetwork,  btcController.getAddress)
 module.exports = router;

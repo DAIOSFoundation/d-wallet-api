@@ -279,6 +279,17 @@ const postSethdseed = async (req, res) => {
   }
 };
 
+const getAddress = async (req, res) => {
+  try {
+    const {client} = req;
+    const result = await client.getNewAddress();
+    const address = result.toString("hex");
+    return cwr.createWebResp(res, 200, {address});
+  } catch (e) {
+    return cwr.errorWebResp(res, 500, 'E0000 - getAddress', e.message);
+  }
+};
+
 module.exports = {
   postDecodeMnemonic,
   postDecodeWIF,
@@ -297,4 +308,5 @@ module.exports = {
   postDumpWallet,
   postImportprivkey,
   postSethdseed,
+  getAddress,
 };
