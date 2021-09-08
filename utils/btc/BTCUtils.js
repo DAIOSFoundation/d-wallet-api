@@ -6,4 +6,4 @@ class BTCUtils {
 
 module.exports = {
   BTCUtils,
-}
+};

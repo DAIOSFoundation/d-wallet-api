@@ -56,13 +56,13 @@ const watchlistRouter = require('./routes/api/watchlist');
 const btcRouter = require('./routes/api/btc');
 const xlmRouter = require('./routes/api/xlm');
 const ethRouter = require('./routes/api/eth');
+const solRouter = require('./routes/api/sol');
 const aaveRouter = require('./routes/api/aave');
 const tronRouter = require('./routes/api/tron');
 const atemRouter = require('./routes/api/atem');
 const orbsRouter = require('./routes/api/orbs');
 const didRouter = require('./routes/api/did');
 const nftRouter = require('./routes/api/nft');
-const solRouter = require('./routes/api/sol');
 
 const app = express();
 
@@ -93,13 +93,13 @@ app.use(`${version}/assets`, assetsRouter);
 app.use(`${version}/btc`, btcRouter);
 app.use(`${version}/xlm`, xlmRouter);
 app.use(`${version}/eth`, ethRouter);
+app.use(`${version}/sol`, solRouter);
 app.use(`${version}/aave`, aaveRouter);
 app.use(`${version}/tron`, tronRouter);
 app.use(`${version}/atem`, atemRouter);
 app.use(`${version}/orbs`, orbsRouter);
 app.use(`${version}/did`, didRouter);
 app.use(`${version}/nft`, nftRouter);
-app.use(`${version}/sol`, solRouter);
 
 // Initial Syncing Service
 const {Syncing} = require('./utils/Syncing');

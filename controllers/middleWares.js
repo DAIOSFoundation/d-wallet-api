@@ -234,6 +234,27 @@ const btcLastBlockHash = async (req, res, next) => {
   }
 };
 
+/// /////////////////// Middleware for SOL (Solana) //////////////////////
+const checkSOLNetwork = async (req, res, next) => {
+  try {
+    const network = req.body.network || req.query.network;
+    let endpoint = '';
+    if (network === 'mainnet') {
+      endpoint = 'https://solana-api.projectserum.com';
+    } else if (network === 'devnet') {
+      endpoint = 'https://api.devnet.solana.com';
+    } else if (network === 'testnet') {
+      endpoint = 'https://api.testnet.solana.com';
+    } else {
+      return cwr.errorWebResp(res, 500, `E0000 - checkSOLNetwork`);
+    }
+    req.endpoint = endpoint;
+    next();
+  } catch (e) {
+    return cwr.errorWebResp(res, 500, `E0000 - checkSOLNetwork`, e.message);
+  }
+};
+
 /// /////////////////// Middleware for Aave //////////////////////
 const aaveNetwork = async (req, res, next) => {
   try {
@@ -319,10 +340,14 @@ const multerInitialize = async (req, res, next) => {
 
 const upload = multer({storage});
 
+////////////////////// Middleware for solana //////////////////////
 const solanaNetwork = async (req, res, next) => {
   try {
     req.network = req.body.network || req.query.network;
     req.web3 = solanaWeb3;
+
+    const url=solanaWeb3.clusterApiUrl(req.network);
+
     req.connection = new solanaWeb3.Connection(
       solanaWeb3.clusterApiUrl(req.network),
       'confirmed',
@@ -344,6 +369,7 @@ module.exports = {
   checkBTCNetwork,
   etherscan,
   btcNetwork,
+  checkSOLNetwork,
   aaveNetwork,
   btcLastBlockHash,
   tronNetwork,

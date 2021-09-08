@@ -16,4 +16,11 @@ router.post('/airdropFromMnemonic', mw.solanaNetwork, solController.postAirdropF
 
 router.post('/decodeMnemonic', mw.solanaNetwork, solController.postDecodeMnemonic);
 
+router.post(
+  '/decodeMnemonic',
+  mw.checkMnemonic,
+  // mw.checkSOLNetwork,
+  solController.postDecodeMnemonic,
+);
+
 module.exports = router;
