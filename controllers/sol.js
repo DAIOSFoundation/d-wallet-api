@@ -4,39 +4,93 @@ const {derivePath} = require('ed25519-hd-key');
 const {Account} = require('@solana/web3.js');
 const bip32 = require('bip32');
 const bip39 = require('bip39');
-const nacl = require('tweetnacl');
 
 const toSOL = (value) =>{return value/(10**9)}
-const fromSOL = (value) =>{return value/(10**9)}
-
-/*
-const postDecodeMnemonic = async (req, res) => {
-  try {
-    const {mnemonic} = req.body;
-    const seed = await bip39.mnemonicToSeedSync(mnemonic);
-    const keyPair =  req.web3.Keypair.fromSeed(seed.slice(0, 32));
-    //const account =  new req.web3.Account(keyPair.secretKey);
-    const publicKey = keyPair.publicKey.toString();
-    const secretKey = keyPair.secretKey.toString("hex");
-    return cwr.createWebResp(res, 200, {seed:seed.toString("hex"), publicKey, secretKey});
-  } catch (e) {
-    return cwr.errorWebResp(res, 500, 'E0000 - postDecodeMnemonic', e.message);
-  }
-};
-*/
-
+const fromSOL = (value) =>{return value*(10**9)}
 
 const getBalance = async (req, res) => {
   try {
     const {address} = req.query;
-    const url = req.web3.clusterApiUrl(req.network);
+    const url = req.endpoint;
     const result = await axios.post(url, {"jsonrpc":"2.0", "id":1, "method":"getBalance", "params":[address]});
     const balance = toSOL(result?.data?.result?.value);
-    return cwr.createWebResp(res, 200, {balance});
+    return cwr.createWebResp(res, 200, {balance, "UNIT": "SOL"});
   } catch (e) {
     return cwr.errorWebResp(res, 500, 'E0000 - getBalance', e.message);
   }
 };
+
+const getTokenBalance = async (req, res) => {
+  try {
+    const {address, mint, programId} = req.query;
+    if(!!mint && !!programId)
+    {
+      return cwr.errorWebResp(res, 500, 'E0000 - getTokenBalance', "input mint or programId");
+    }
+    const url = req.web3.clusterApiUrl(req.network);
+    const options = {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "getTokenAccountsByOwner",
+      "params": [
+        address,
+        {
+          programId,
+          mint,
+        },
+        {
+          "encoding": "jsonParsed"
+        }
+      ]
+    };
+    const result = await axios.post(url, options);
+    const rawData = result?.data?.result?.value;
+    let token = [];
+    if(rawData)
+    {
+      for (let i in rawData)
+      {
+        const amount = rawData[i]?.account?.data?.parsed?.info?.tokenAmount?.amount;
+        const decimals = rawData[i]?.account?.data?.parsed?.info?.tokenAmount?.decimals;
+        const balance = amount / (10**decimals);
+        const pubkey = rawData[i]?.pubkey;
+        const mint = rawData[i]?.account?.data?.parsed?.info?.mint;
+        token.push({
+          pubkey,
+          balance,
+          amount,
+          decimals,
+          mint,
+        });
+      }
+    }
+    else
+    {
+      return cwr.errorWebResp(res, 500, 'E0000 - getTokenBalance', "failed axios");
+    }
+    return cwr.createWebResp(res, 200, {token, rawData});
+  } catch (e) {
+    return cwr.errorWebResp(res, 500, 'E0000 - getTokenBalance', e.message);
+  }
+};
+
+/*const getTokenBalance = async (req, res) => {
+  try {
+    const {address, mint, programId} = req.query;
+    const ownerAddress = new req.web3.PublicKey(address);
+    const programIdPubKey = !!programId ? new req.web3.PublicKey(programId) : programId;
+    const mintPubKey = !!mint ? new req.web3.PublicKey(mint) : mint;
+    const filter = {
+      //programId: programIdPubKey,
+      mint: mintPubKey,
+    };
+    const result = await req.connection.getTokenAccountsByOwner(ownerAddress, filter);
+
+    return cwr.createWebResp(res, 200, result);
+  } catch (e) {
+    return cwr.errorWebResp(res, 500, 'E0000 - getTokenBalance', e.message);
+  }
+};*/
 
 const getBlock = async (req, res) => {
   try {
@@ -60,6 +114,7 @@ const getTransaction = async (req, res) => {
   }
 };
 
+/*
 const postAirdropFromMnemonic = async (req, res) => {
   try {
     const {mnemonic, value} = req.query;
@@ -73,6 +128,7 @@ const postAirdropFromMnemonic = async (req, res) => {
     return cwr.errorWebResp(res, 500, 'E0000 - postAirdropFromMnemonic', e.message);
   }
 };
+*/
 
 const postAirdropFromAddress = async (req, res) => {
   try {
@@ -95,16 +151,24 @@ const postDecodeMnemonic = async (req, res) => {
     const hexSeed = Buffer.from(seed).toString('hex');
     const derivedSeed = derivePath(path, hexSeed).key;
     const account = new Account(
-      nacl.sign.keyPair.fromSeed(derivedSeed).secretKey,
+      req.web3.Keypair.fromSeed(derivedSeed).secretKey,
     );
+    const publicKey = account.publicKey.toString();
+    const secretKey = account.secretKey.toString("hex");
     const form = {
       path,
-      account: account.publicKey.toString(),
+      account: publicKey,
+      secretKey,
+      seed: Buffer.from(seed).toString('hex'),
     };
+
     const keyPair =  req.web3.Keypair.fromSeed(seed.slice(0, 32));
-    const publicKey = keyPair.publicKey.toString();
-    const secretKey = keyPair.secretKey.toString("hex");
-    return cwr.createWebResp(res, 200, {form, publicKey, secretKey:secretKey.toString('hex'), seed:seed.toString('hex')});
+    const solletWallet = {
+      publicKey: keyPair.publicKey.toString(),
+      privateKey: keyPair.secretKey.toString(),
+    }
+
+    return cwr.createWebResp(res, 200, {form, solletWallet});
   } catch (e) {
     return cwr.errorWebResp(res, 500, `E0000 - postDecodeMnemonic`, e.message);
   }
@@ -112,9 +176,10 @@ const postDecodeMnemonic = async (req, res) => {
 
 module.exports = {
   getBalance,
+  getTokenBalance,
   getBlock,
   getTransaction,
-  postAirdropFromMnemonic,
+  //postAirdropFromMnemonic,
   postDecodeMnemonic,
   postAirdropFromAddress,
 };
