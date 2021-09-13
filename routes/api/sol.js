@@ -10,18 +10,21 @@ router.get('/block', mw.solanaNetwork, solController.getBlock);
 
 router.get('/transaction', mw.solanaNetwork, solController.getTransaction);
 
-router.get('/airdropFromAddress', mw.solanaNetwork, solController.postAirdropFromAddress);
-
-//router.post('/airdropFromMnemonic', mw.solanaNetwork, solController.postAirdropFromMnemonic);
-
-router.post('/decodeMnemonic', mw.solanaNetwork, solController.postDecodeMnemonic);
+router.get(
+  '/airdropFromAddress',
+  mw.solanaNetwork,
+  solController.postAirdropFromAddress,
+);
 
 router.get('/tokenBalance', mw.solanaNetwork, solController.getTokenBalance);
 
 router.post(
   '/decodeMnemonic',
   mw.checkMnemonic,
+  mw.solanaNetwork,
   solController.postDecodeMnemonic,
 );
+
+router.post('/send', mw.solanaNetwork, solController.postSend);
 
 module.exports = router;

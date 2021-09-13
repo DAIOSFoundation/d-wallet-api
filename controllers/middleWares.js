@@ -6,13 +6,13 @@ const TronWeb = require('tronweb');
 const ethers = require('ethers');
 const {create, globSource} = require('ipfs-http-client');
 const multer = require('multer');
+const solanaWeb3 = require('@solana/web3.js');
+const winston = require('winston');
 const cwr = require('../utils/createWebResp');
 const stellarConfig = require('../config/XLM/stellar');
 const eth = require('../config/ETH/eth');
 const aave = require('../config/AAVE/aave');
 const {etherscanWebUrl} = require('../config/ETH/eth');
-const solanaWeb3 = require('@solana/web3.js');
-const winston = require("winston");
 
 /// /////////////////// Middleware for XLM //////////////////////
 const isValidMnemonic = async (req, res, next) => {
@@ -239,11 +239,8 @@ const solanaNetwork = async (req, res, next) => {
   try {
     req.network = req.body.network || req.query.network;
     req.web3 = solanaWeb3;
-    req.endpoint=solanaWeb3.clusterApiUrl(req.network);
-    req.connection = new solanaWeb3.Connection(
-      req.endpoint,
-      'confirmed',
-    );
+    req.endpoint = solanaWeb3.clusterApiUrl(req.network);
+    req.connection = new solanaWeb3.Connection(req.endpoint, 'confirmed');
     next();
   } catch (e) {
     return cwr.errorWebResp(res, 500, `E0000 - solanaNetwork`, e.message);
@@ -334,8 +331,6 @@ const multerInitialize = async (req, res, next) => {
 };
 
 const upload = multer({storage});
-
-
 
 module.exports = {
   isValidMnemonic,
