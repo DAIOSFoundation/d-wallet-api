@@ -334,7 +334,7 @@ const getGasPriceFromWeb3 = async (req, res) => {
       gasPrice: await req.web3.eth.getGasPrice(),
       feeHistory: await req.web3.eth.getFeeHistory('latest'),
     };
-    return cwr.createWebResp(res, 200, );
+    return cwr.createWebResp(res, 200);
   } catch (e) {
     return cwr.errorWebResp(res, 500, 'E0000 - getGasPrice', e.message || e);
   }

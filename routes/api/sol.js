@@ -30,39 +30,35 @@ router.post('/send', mw.solanaNetwork, solController.postSend);
 router.get('/validatorList', solController.getValidatorList);
 
 router.post(
-    '/stake',
-    mw.checkMnemonic,
-    mw.solanaNetwork,
-    solController.postStake,
+  '/stake',
+  mw.checkMnemonic,
+  mw.solanaNetwork,
+  solController.postStake,
 );
 
 router.post(
-    '/delegate',
-    mw.checkMnemonic,
-    mw.solanaNetwork,
-    solController.postDelegate,
+  '/delegate',
+  mw.checkMnemonic,
+  mw.solanaNetwork,
+  solController.postDelegate,
 );
 
 router.get('/stakeInfo', mw.solanaNetwork, solController.getStakeInfo);
 
 router.post(
-    '/deactivate',
-    mw.checkMnemonic,
-    mw.solanaNetwork,
-    solController.postDeactivate,
+  '/deactivate',
+  mw.checkMnemonic,
+  mw.solanaNetwork,
+  solController.postDeactivate,
 );
 
-router.post(
-    '/privToPub',
-    mw.solanaNetwork,
-    solController.postPrivToPubkey,
-);
+router.post('/privToPub', mw.solanaNetwork, solController.postPrivToPubkey);
 
 router.post(
-    '/withdraw',
-    mw.checkMnemonic,
-    mw.solanaNetwork,
-    solController.postWithdraw,
+  '/withdraw',
+  mw.checkMnemonic,
+  mw.solanaNetwork,
+  solController.postWithdraw,
 );
 
 module.exports = router;

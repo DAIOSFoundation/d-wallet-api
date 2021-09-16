@@ -150,7 +150,7 @@ const postDecodeMnemonic = async (req, res) => {
     const hexSeed = Buffer.from(seed).toString('hex');
     const derivedSeed = derivePath(path, hexSeed).key;
     const account = new Account(
-        req.web3.Keypair.fromSeed(derivedSeed).secretKey,
+      req.web3.Keypair.fromSeed(derivedSeed).secretKey,
     );
     const publicKey = account.publicKey.toString();
     const secretKey = account.secretKey.toString('hex');
@@ -174,7 +174,9 @@ const postDecodeMnemonic = async (req, res) => {
 const postPrivToPubkey = async (req, res) => {
   try {
     const {privateKey} = req.body;
-    const keypair = req.web3.Keypair.fromSecretKey(Uint8Array.from(privateKey.split(",")));
+    const keypair = req.web3.Keypair.fromSecretKey(
+      Uint8Array.from(privateKey.split(',')),
+    );
     const account = {
       publicKey: keypair.publicKey.toString(),
       secretKey: keypair.secretKey.toString(),
@@ -189,18 +191,19 @@ const postSend = async (req, res) => {
   try {
     const {fromMnemonic, fromPrivateKey, toAddress, balance} = req.body;
     let from;
-    if(fromMnemonic)
-    {
+    if (fromMnemonic) {
       const seed = bip39.mnemonicToSeedSync(fromMnemonic);
       from = req.web3.Keypair.fromSeed(seed.slice(0, 32));
-    }
-    else if (fromPrivateKey)
-    {
-      const privKey = Uint8Array.from(fromPrivateKey.split(","));
+    } else if (fromPrivateKey) {
+      const privKey = Uint8Array.from(fromPrivateKey.split(','));
       from = req.web3.Keypair.fromSecretKey(privKey);
-    }
-    else {
-      return cwr.errorWebResp(res, 500, `E0000 - postSendSol`, "input one of fromMnemonic or fromPrivateKey");
+    } else {
+      return cwr.errorWebResp(
+        res,
+        500,
+        `E0000 - postSendSol`,
+        'input one of fromMnemonic or fromPrivateKey',
+      );
     }
     const to = new req.web3.PublicKey(toAddress);
     const transaction = new req.web3.Transaction().add(
@@ -225,9 +228,12 @@ const postSend = async (req, res) => {
 const getValidatorList = async (req, res) => {
   try {
     const {endpoint, limit} = req.query;
-    const head = {Token: "fNKNm5UeMKVHnDouXVwmCcpe"};
-    const url = 'https://www.validators.app/api/v1/validators/' + endpoint + '.json?'
-        + (limit ? ('limit='+limit) : 'limit=10');
+    const head = {Token: 'fNKNm5UeMKVHnDouXVwmCcpe'};
+    const url =
+      'https://www.validators.app/api/v1/validators/' +
+      endpoint +
+      '.json?' +
+      (limit ? 'limit=' + limit : 'limit=10');
     const response = await axios.get(url, {headers: head});
     const data = response?.data;
     return cwr.createWebResp(res, 200, data);
@@ -244,9 +250,7 @@ const getStakeInfo = async (req, res) => {
       jsonrpc: '2.0',
       id: 1,
       method: 'getStakeActivation',
-      params: [
-        address
-      ],
+      params: [address],
     });
     const data = result?.data;
     return cwr.createWebResp(res, 200, {data});
@@ -257,51 +261,53 @@ const getStakeInfo = async (req, res) => {
 
 const postStake = async (req, res) => {
   try {
-    const {fromMnemonic, fromPrivateKey, balance, votePubkey, stakeSecretKey} = req.body;
+    const {fromMnemonic, fromPrivateKey, balance, votePubkey, stakeSecretKey} =
+      req.body;
     let from;
-    if(fromMnemonic)
-    {
+    if (fromMnemonic) {
       const seed = bip39.mnemonicToSeedSync(fromMnemonic);
       from = req.web3.Keypair.fromSeed(seed.slice(0, 32));
-    }
-    else if (fromPrivateKey)
-    {
-      const privKey = Uint8Array.from(fromPrivateKey.split(","));
+    } else if (fromPrivateKey) {
+      const privKey = Uint8Array.from(fromPrivateKey.split(','));
       from = req.web3.Keypair.fromSecretKey(privKey);
-    }
-    else {
-      return cwr.errorWebResp(res, 500, `E0000 - postSendSol`, "input one of fromMnemonic or fromPrivateKey");
+    } else {
+      return cwr.errorWebResp(
+        res,
+        500,
+        `E0000 - postSendSol`,
+        'input one of fromMnemonic or fromPrivateKey',
+      );
     }
     let stakeAccount;
-    if(stakeSecretKey)
-    {
-      stakeAccount = req.web3.Keypair.fromSecretKey(Uint8Array.from(stakeSecretKey.split(",")));
-    }
-    else
-    {
+    if (stakeSecretKey) {
+      stakeAccount = req.web3.Keypair.fromSecretKey(
+        Uint8Array.from(stakeSecretKey.split(',')),
+      );
+    } else {
       stakeAccount = new req.web3.Keypair();
     }
     const authorized = new req.web3.Authorized(from.publicKey, from.publicKey);
     let transaction = new req.web3.Transaction({feePayer: from.publicKey});
     transaction.add(
-        req.web3.StakeProgram.createAccount({
-          fromPubkey: from.publicKey,
-          stakePubkey: stakeAccount.publicKey,
-          authorized: authorized,
-          lamports: fromSOL(balance),
-          //lockup: new req.web3.Lockup(0,0,new req.web3.PublicKey(0)),
-        }));
+      req.web3.StakeProgram.createAccount({
+        fromPubkey: from.publicKey,
+        stakePubkey: stakeAccount.publicKey,
+        authorized: authorized,
+        lamports: fromSOL(balance),
+        //lockup: new req.web3.Lockup(0,0,new req.web3.PublicKey(0)),
+      }),
+    );
     const signature = await req.web3.sendAndConfirmTransaction(
-        req.connection,
-        transaction,
-        [from, stakeAccount],
+      req.connection,
+      transaction,
+      [from, stakeAccount],
     );
     const tx = await req.connection.getTransaction(signature);
     const stakeAccountInfo = {
       publicKey: stakeAccount.publicKey.toString(),
       secretKey: stakeAccount.secretKey.toString(),
       network: req.web3.clusterApiUrl(),
-    }
+    };
     return cwr.createWebResp(res, 200, {stakeAccountInfo, signature, tx});
   } catch (e) {
     return cwr.errorWebResp(res, 500, `E0000 - postStake`, e.message);
@@ -312,35 +318,43 @@ const postDelegate = async (req, res) => {
   try {
     const {fromMnemonic, fromPrivateKey, votePubkey, stakeSecretKey} = req.body;
     let from;
-    if(fromMnemonic)
-    {
+    if (fromMnemonic) {
       const seed = bip39.mnemonicToSeedSync(fromMnemonic);
       from = req.web3.Keypair.fromSeed(seed.slice(0, 32));
-    }
-    else if (fromPrivateKey)
-    {
-      const privKey = Uint8Array.from(fromPrivateKey.split(","));
+    } else if (fromPrivateKey) {
+      const privKey = Uint8Array.from(fromPrivateKey.split(','));
       from = req.web3.Keypair.fromSecretKey(privKey);
+    } else {
+      return cwr.errorWebResp(
+        res,
+        500,
+        `E0000 - postSendSol`,
+        'input one of fromMnemonic or fromPrivateKey',
+      );
     }
-    else {
-      return cwr.errorWebResp(res, 500, `E0000 - postSendSol`, "input one of fromMnemonic or fromPrivateKey");
+    if (!stakeSecretKey) {
+      return cwr.errorWebResp(
+        res,
+        500,
+        `E0000 - postSendSol`,
+        'input stakeSecretKey',
+      );
     }
-    if(!stakeSecretKey)
-    {
-      return cwr.errorWebResp(res, 500, `E0000 - postSendSol`, "input stakeSecretKey");
-    }
-    const stakeAccount = req.web3.Keypair.fromSecretKey(Uint8Array.from(stakeSecretKey.split(",")));
+    const stakeAccount = req.web3.Keypair.fromSecretKey(
+      Uint8Array.from(stakeSecretKey.split(',')),
+    );
     let transaction = new req.web3.Transaction({feePayer: from.publicKey});
     transaction.add(
-        req.web3.StakeProgram.delegate({
-          authorizedPubkey: from.publicKey,
-          stakePubkey: stakeAccount.publicKey,
-          votePubkey: votePubkey,
-        }));
+      req.web3.StakeProgram.delegate({
+        authorizedPubkey: from.publicKey,
+        stakePubkey: stakeAccount.publicKey,
+        votePubkey: votePubkey,
+      }),
+    );
     const signature = await req.web3.sendAndConfirmTransaction(
-        req.connection,
-        transaction,
-        [from],
+      req.connection,
+      transaction,
+      [from],
     );
     const tx = await req.connection.getTransaction(signature);
     const stakeAccountInfo = {
@@ -357,35 +371,43 @@ const postDeactivate = async (req, res) => {
   try {
     const {fromMnemonic, fromPrivateKey, stakeSecretKey} = req.body;
     let from;
-    if(fromMnemonic)
-    {
+    if (fromMnemonic) {
       const seed = bip39.mnemonicToSeedSync(fromMnemonic);
       from = req.web3.Keypair.fromSeed(seed.slice(0, 32));
-    }
-    else if (fromPrivateKey)
-    {
-      const privKey = Uint8Array.from(fromPrivateKey.split(","));
+    } else if (fromPrivateKey) {
+      const privKey = Uint8Array.from(fromPrivateKey.split(','));
       from = req.web3.Keypair.fromSecretKey(privKey);
+    } else {
+      return cwr.errorWebResp(
+        res,
+        500,
+        `E0000 - postSendSol`,
+        'input one of fromMnemonic or fromPrivateKey',
+      );
     }
-    else {
-      return cwr.errorWebResp(res, 500, `E0000 - postSendSol`, "input one of fromMnemonic or fromPrivateKey");
+    if (!stakeSecretKey) {
+      return cwr.errorWebResp(
+        res,
+        500,
+        `E0000 - postSendSol`,
+        'input stakeSecretKey',
+      );
     }
-    if(!stakeSecretKey)
-    {
-      return cwr.errorWebResp(res, 500, `E0000 - postSendSol`, "input stakeSecretKey");
-    }
-    const stakeAccount = req.web3.Keypair.fromSecretKey(Uint8Array.from(stakeSecretKey.split(",")));
+    const stakeAccount = req.web3.Keypair.fromSecretKey(
+      Uint8Array.from(stakeSecretKey.split(',')),
+    );
     let transaction = new req.web3.Transaction({feePayer: from.publicKey});
     transaction.add(
-        req.web3.StakeProgram.deactivate({
-          authorizedPubkey: from.publicKey,
-          stakePubkey: stakeAccount.publicKey,
-          //votePubkey: votePubkey,
-        }));
+      req.web3.StakeProgram.deactivate({
+        authorizedPubkey: from.publicKey,
+        stakePubkey: stakeAccount.publicKey,
+        //votePubkey: votePubkey,
+      }),
+    );
     const signature = await req.web3.sendAndConfirmTransaction(
-        req.connection,
-        transaction,
-        [from],//
+      req.connection,
+      transaction,
+      [from], //
     );
     const tx = await req.connection.getTransaction(signature);
     const stakeAccountInfo = {
@@ -402,36 +424,44 @@ const postWithdraw = async (req, res) => {
   try {
     const {fromMnemonic, fromPrivateKey, stakeSecretKey, amount} = req.body;
     let from;
-    if(fromMnemonic)
-    {
+    if (fromMnemonic) {
       const seed = bip39.mnemonicToSeedSync(fromMnemonic);
       from = req.web3.Keypair.fromSeed(seed.slice(0, 32));
-    }
-    else if (fromPrivateKey)
-    {
-      const privKey = Uint8Array.from(fromPrivateKey.split(","));
+    } else if (fromPrivateKey) {
+      const privKey = Uint8Array.from(fromPrivateKey.split(','));
       from = req.web3.Keypair.fromSecretKey(privKey);
+    } else {
+      return cwr.errorWebResp(
+        res,
+        500,
+        `E0000 - postSendSol`,
+        'input one of fromMnemonic or fromPrivateKey',
+      );
     }
-    else {
-      return cwr.errorWebResp(res, 500, `E0000 - postSendSol`, "input one of fromMnemonic or fromPrivateKey");
+    if (!stakeSecretKey) {
+      return cwr.errorWebResp(
+        res,
+        500,
+        `E0000 - postSendSol`,
+        'input stakeSecretKey',
+      );
     }
-    if(!stakeSecretKey)
-    {
-      return cwr.errorWebResp(res, 500, `E0000 - postSendSol`, "input stakeSecretKey");
-    }
-    const stakeAccount = req.web3.Keypair.fromSecretKey(Uint8Array.from(stakeSecretKey.split(",")));
+    const stakeAccount = req.web3.Keypair.fromSecretKey(
+      Uint8Array.from(stakeSecretKey.split(',')),
+    );
     let transaction = new req.web3.Transaction({feePayer: from.publicKey});
     transaction.add(
-        req.web3.StakeProgram.withdraw({
-          authorizedPubkey: from.publicKey,
-          stakePubkey: stakeAccount.publicKey,
-          lamports: fromSOL(amount),
-          toPubkey: from.publicKey,
-        }));
+      req.web3.StakeProgram.withdraw({
+        authorizedPubkey: from.publicKey,
+        stakePubkey: stakeAccount.publicKey,
+        lamports: fromSOL(amount),
+        toPubkey: from.publicKey,
+      }),
+    );
     const signature = await req.web3.sendAndConfirmTransaction(
-        req.connection,
-        transaction,
-        [from],
+      req.connection,
+      transaction,
+      [from],
     );
     const tx = await req.connection.getTransaction(signature);
     const stakeAccountInfo = {
