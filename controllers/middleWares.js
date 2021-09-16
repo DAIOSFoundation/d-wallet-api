@@ -239,8 +239,8 @@ const solanaNetwork = async (req, res, next) => {
   try {
     req.network = req.body.network || req.query.network;
     req.web3 = solanaWeb3;
-    req.endpoint = solanaWeb3.clusterApiUrl(req.network);
-    req.connection = new solanaWeb3.Connection(req.endpoint, 'confirmed');
+    req.endpoint = req.web3.clusterApiUrl(req.network);
+    req.connection = new req.web3.Connection(req.endpoint, 'confirmed');
     next();
   } catch (e) {
     return cwr.errorWebResp(res, 500, `E0000 - solanaNetwork`, e.message);
