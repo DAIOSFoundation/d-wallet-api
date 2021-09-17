@@ -234,7 +234,7 @@ const postSend = async (req, res) => {
 const getValidatorList = async (req, res) => {
   try {
     const {endpoint, limit} = req.query;
-    const head = {Token: 'fNKNm5UeMKVHnDouXVwmCcpe'};
+    const head = {Token: process.env.SOL_API_KEY};
     const url = `https://www.validators.app/api/v1/validators/${endpoint}.json?${
       limit ? `limit=${limit}` : 'limit=10'
     }`;
