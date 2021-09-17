@@ -1,16 +1,17 @@
 const axios = require('axios');
 const {derivePath} = require('ed25519-hd-key');
-const {Account} = require('@solana/web3.js');
+const {Account, Keypair} = require('@solana/web3.js');
 const bip32 = require('bip32');
 const bip39 = require('bip39');
 const cwr = require('../utils/createWebResp');
-
-const toSOL = (value) => {
-  return value / 10 ** 9;
-};
-const fromSOL = (value) => {
-  return value * 10 ** 9;
-};
+const {
+  toSOL,
+  fromSOL,
+  DERIVATION_PATH,
+  PATH,
+  getAccountFromSeed,
+  getKeypairFromSeed,
+} = require('../config/SOL/solana');
 
 const getBalance = async (req, res) => {
   try {
@@ -144,28 +145,33 @@ const postAirdropFromAddress = async (req, res) => {
 
 const postDecodeMnemonic = async (req, res) => {
   try {
-    const {mnemonic, index} = req.body;
-    const path = `m/44'/501'/${index}'`;
+    const {mnemonic, accountIndex, walletIndex} = req.body;
     const seed = bip39.mnemonicToSeedSync(mnemonic);
-    const hexSeed = Buffer.from(seed).toString('hex');
-    const derivedSeed = derivePath(path, hexSeed).key;
-    const account = new Account(
-      req.web3.Keypair.fromSeed(derivedSeed).secretKey,
-    );
-    const publicKey = account.publicKey.toString();
-    const secretKey = account.secretKey.toString('hex');
-    const form = {
-      path,
-      account: publicKey,
-      secretKey,
-      seed: Buffer.from(seed).toString('hex'),
+    const wallet = {
+      bip39Seed: seed.toString('hex'),
     };
-    const keyPair = req.web3.Keypair.fromSeed(seed.slice(0, 32));
-    const solletWallet = {
-      publicKey: keyPair.publicKey.toString(),
-      privateKey: keyPair.secretKey.toString(),
-    };
-    return cwr.createWebResp(res, 200, {form, solletWallet});
+    for (const item in DERIVATION_PATH) {
+      const account = getAccountFromSeed(
+        seed,
+        walletIndex,
+        DERIVATION_PATH[item],
+        accountIndex,
+      );
+      const keypair = getKeypairFromSeed(
+        seed,
+        walletIndex,
+        DERIVATION_PATH[item],
+        accountIndex,
+      );
+      wallet[item] = {
+        path: PATH[item],
+        publicKey: account.publicKey.toString(),
+        privateKey: account.secretKey.toString('hex'),
+        // keypairPublicKey: keypair.publicKey.toString(),
+        keypairSecertKey: keypair.secretKey.toString(),
+      };
+    }
+    return cwr.createWebResp(res, 200, wallet);
   } catch (e) {
     return cwr.errorWebResp(res, 500, `E0000 - postDecodeMnemonic`, e.message);
   }
@@ -229,11 +235,9 @@ const getValidatorList = async (req, res) => {
   try {
     const {endpoint, limit} = req.query;
     const head = {Token: 'fNKNm5UeMKVHnDouXVwmCcpe'};
-    const url =
-      'https://www.validators.app/api/v1/validators/' +
-      endpoint +
-      '.json?' +
-      (limit ? 'limit=' + limit : 'limit=10');
+    const url = `https://www.validators.app/api/v1/validators/${endpoint}.json?${
+      limit ? `limit=${limit}` : 'limit=10'
+    }`;
     const response = await axios.get(url, {headers: head});
     const data = response?.data;
     return cwr.createWebResp(res, 200, data);
@@ -287,14 +291,14 @@ const postStake = async (req, res) => {
       stakeAccount = new req.web3.Keypair();
     }
     const authorized = new req.web3.Authorized(from.publicKey, from.publicKey);
-    let transaction = new req.web3.Transaction({feePayer: from.publicKey});
+    const transaction = new req.web3.Transaction({feePayer: from.publicKey});
     transaction.add(
       req.web3.StakeProgram.createAccount({
         fromPubkey: from.publicKey,
         stakePubkey: stakeAccount.publicKey,
-        authorized: authorized,
+        authorized,
         lamports: fromSOL(balance),
-        //lockup: new req.web3.Lockup(0,0,new req.web3.PublicKey(0)),
+        // lockup: new req.web3.Lockup(0,0,new req.web3.PublicKey(0)),
       }),
     );
     const signature = await req.web3.sendAndConfirmTransaction(
@@ -343,12 +347,12 @@ const postDelegate = async (req, res) => {
     const stakeAccount = req.web3.Keypair.fromSecretKey(
       Uint8Array.from(stakeSecretKey.split(',')),
     );
-    let transaction = new req.web3.Transaction({feePayer: from.publicKey});
+    const transaction = new req.web3.Transaction({feePayer: from.publicKey});
     transaction.add(
       req.web3.StakeProgram.delegate({
         authorizedPubkey: from.publicKey,
         stakePubkey: stakeAccount.publicKey,
-        votePubkey: votePubkey,
+        votePubkey,
       }),
     );
     const signature = await req.web3.sendAndConfirmTransaction(
@@ -396,12 +400,12 @@ const postDeactivate = async (req, res) => {
     const stakeAccount = req.web3.Keypair.fromSecretKey(
       Uint8Array.from(stakeSecretKey.split(',')),
     );
-    let transaction = new req.web3.Transaction({feePayer: from.publicKey});
+    const transaction = new req.web3.Transaction({feePayer: from.publicKey});
     transaction.add(
       req.web3.StakeProgram.deactivate({
         authorizedPubkey: from.publicKey,
         stakePubkey: stakeAccount.publicKey,
-        //votePubkey: votePubkey,
+        // votePubkey: votePubkey,
       }),
     );
     const signature = await req.web3.sendAndConfirmTransaction(
@@ -449,7 +453,7 @@ const postWithdraw = async (req, res) => {
     const stakeAccount = req.web3.Keypair.fromSecretKey(
       Uint8Array.from(stakeSecretKey.split(',')),
     );
-    let transaction = new req.web3.Transaction({feePayer: from.publicKey});
+    const transaction = new req.web3.Transaction({feePayer: from.publicKey});
     transaction.add(
       req.web3.StakeProgram.withdraw({
         authorizedPubkey: from.publicKey,
