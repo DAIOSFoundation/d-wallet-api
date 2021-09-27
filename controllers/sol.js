@@ -623,8 +623,8 @@ const getTokenInfo = async (req, res) => {
     const tokenList = tokenListOnEndpoint.getList();
     const tokenInfo = tokenAddress
       ? tokenList.find((token) => {
-        return token.address === tokenAddress;
-      })
+          return token.address === tokenAddress;
+        })
       : undefined;
     return cwr.createWebResp(res, 200, {
       Strategy: envStrategy[strategy?.toLowerCase()],

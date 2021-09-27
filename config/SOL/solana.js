@@ -1,16 +1,12 @@
-const {
-  Account,
-  Keypair,
-  PublicKey,
-} = require('@solana/web3.js');
+const {Account, Keypair, PublicKey} = require('@solana/web3.js');
 const bip32 = require('bip32');
 const {derivePath} = require('ed25519-hd-key');
 
 const toSOL = (value, decimals) => {
-  return value / 10 ** (decimals?decimals:9);
+  return value / 10 ** (decimals || 9);
 };
 const fromSOL = (value, decimals) => {
-  return value * 10 ** (decimals?decimals:9);
+  return value * 10 ** (decimals || 9);
 };
 
 const DERIVATION_PATH = {
