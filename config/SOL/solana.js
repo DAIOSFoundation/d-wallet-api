@@ -85,6 +85,5 @@ module.exports = {
   deriveSeed,
   getAccountFromSeed,
   getKeypairFromSeed,
-  deriveSeed,
   TOKEN_PROGRAM_ID,
 };

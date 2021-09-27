@@ -153,8 +153,8 @@ const postAirdropFromAddress = async (req, res) => {
 
 const postDecodeMnemonic = async (req, res) => {
   try {
-    const {mnemonic, accountIndex, walletIndex} = req.body;
-    const seed = bip39.mnemonicToSeedSync(mnemonic);
+    const {mnemonic, accountIndex, walletIndex, password} = req.body;
+    const seed = bip39.mnemonicToSeedSync(mnemonic, password);
     const wallet = {
       bip39Seed: seed.toString('hex'),
     };
