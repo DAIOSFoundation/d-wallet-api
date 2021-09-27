@@ -26,26 +26,6 @@ const PATH = {
   test: `m/44'/501'/accountIndex'`,
 };
 
-function getAccountFromSeed(
-  seed,
-  walletIndex,
-  dPath = undefined,
-  accountIndex = 0,
-) {
-  const derivedSeed = deriveSeed(seed, walletIndex, dPath, accountIndex);
-  return new Account(Keypair.fromSeed(derivedSeed).secretKey);
-}
-
-function getKeypairFromSeed(
-  seed,
-  walletIndex,
-  dPath = undefined,
-  accountIndex = 0,
-) {
-  const derivedSeed = deriveSeed(seed, walletIndex, dPath, accountIndex);
-  return Keypair.fromSeed(derivedSeed);
-}
-
 function deriveSeed(seed, walletIndex, derivationPath, accountIndex) {
   switch (derivationPath) {
     case DERIVATION_PATH.deprecated:
@@ -73,12 +53,32 @@ function deriveSeed(seed, walletIndex, derivationPath, accountIndex) {
   }
 }
 
+function getAccountFromSeed(
+  seed,
+  walletIndex,
+  dPath = undefined,
+  accountIndex = 0,
+) {
+  const derivedSeed = deriveSeed(seed, walletIndex, dPath, accountIndex);
+  return new Account(Keypair.fromSeed(derivedSeed).secretKey);
+}
+
+function getKeypairFromSeed(
+  seed,
+  walletIndex,
+  dPath = undefined,
+  accountIndex = 0,
+) {
+  const derivedSeed = deriveSeed(seed, walletIndex, dPath, accountIndex);
+  return Keypair.fromSeed(derivedSeed);
+}
+
 module.exports = {
   toSOL,
   fromSOL,
   DERIVATION_PATH,
   PATH,
+  deriveSeed,
   getAccountFromSeed,
   getKeypairFromSeed,
-  deriveSeed,
 };
