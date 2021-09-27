@@ -26,26 +26,6 @@ const PATH = {
   // bip44Root: 'bip44Root', // Ledger only.
 };
 
-function getAccountFromSeed(
-  seed,
-  walletIndex,
-  dPath = undefined,
-  accountIndex = 0,
-) {
-  const derivedSeed = deriveSeed(seed, walletIndex, dPath, accountIndex);
-  return new Account(Keypair.fromSeed(derivedSeed).secretKey);
-}
-
-function getKeypairFromSeed(
-  seed,
-  walletIndex,
-  dPath = undefined,
-  accountIndex = 0,
-) {
-  const derivedSeed = deriveSeed(seed, walletIndex, dPath, accountIndex);
-  return Keypair.fromSeed(derivedSeed);
-}
-
 function deriveSeed(seed, walletIndex, derivationPath, accountIndex) {
   switch (derivationPath) {
     case DERIVATION_PATH.deprecated:
@@ -77,11 +57,32 @@ const TOKEN_PROGRAM_ID = new PublicKey(
   'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
 );
 
+function getAccountFromSeed(
+  seed,
+  walletIndex,
+  dPath = undefined,
+  accountIndex = 0,
+) {
+  const derivedSeed = deriveSeed(seed, walletIndex, dPath, accountIndex);
+  return new Account(Keypair.fromSeed(derivedSeed).secretKey);
+}
+
+function getKeypairFromSeed(
+  seed,
+  walletIndex,
+  dPath = undefined,
+  accountIndex = 0,
+) {
+  const derivedSeed = deriveSeed(seed, walletIndex, dPath, accountIndex);
+  return Keypair.fromSeed(derivedSeed);
+}
+
 module.exports = {
   toSOL,
   fromSOL,
   DERIVATION_PATH,
   PATH,
+  deriveSeed,
   getAccountFromSeed,
   getKeypairFromSeed,
   deriveSeed,
