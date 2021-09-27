@@ -1,29 +1,33 @@
-const {Account, Keypair} = require('@solana/web3.js');
+const {
+  Account,
+  Keypair,
+  PublicKey,
+} = require('@solana/web3.js');
 const bip32 = require('bip32');
 const {derivePath} = require('ed25519-hd-key');
 
-const toSOL = (value) => {
-  return value / 10 ** 9;
+const toSOL = (value, decimals) => {
+  return value / 10 ** (decimals?decimals:9);
 };
-const fromSOL = (value) => {
-  return value * 10 ** 9;
+const fromSOL = (value, decimals) => {
+  return value * 10 ** (decimals?decimals:9);
 };
 
 const DERIVATION_PATH = {
   deprecated: undefined,
   bip44: 'bip44',
   bip44Change: 'bip44Change',
-  // bip44Root: 'bip44Root', // Ledger only.
   cliWallet: 'cliWallet',
   test: 'test',
+  // bip44Root: 'bip44Root', // Ledger only.
 };
 const PATH = {
   deprecated: `m/501'/walletIndex'/0/accountIndex`,
   bip44: `m/44'/501'/walletIndex'`,
   bip44Change: `m/44'/501'/walletIndex'/0'`,
-  // bip44Root: 'bip44Root', // Ledger only.
   cliWallet: 'undefined',
   test: `m/44'/501'/accountIndex'`,
+  // bip44Root: 'bip44Root', // Ledger only.
 };
 
 function getAccountFromSeed(
@@ -73,6 +77,10 @@ function deriveSeed(seed, walletIndex, derivationPath, accountIndex) {
   }
 }
 
+const TOKEN_PROGRAM_ID = new PublicKey(
+  'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+);
+
 module.exports = {
   toSOL,
   fromSOL,
@@ -81,4 +89,5 @@ module.exports = {
   getAccountFromSeed,
   getKeypairFromSeed,
   deriveSeed,
+  TOKEN_PROGRAM_ID,
 };

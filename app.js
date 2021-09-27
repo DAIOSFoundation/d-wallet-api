@@ -63,6 +63,7 @@ const atemRouter = require('./routes/api/atem');
 const orbsRouter = require('./routes/api/orbs');
 const didRouter = require('./routes/api/did');
 const nftRouter = require('./routes/api/nft');
+const rayRouter = require('./routes/api/ray');
 
 const app = express();
 
@@ -100,6 +101,7 @@ app.use(`${version}/atem`, atemRouter);
 app.use(`${version}/orbs`, orbsRouter);
 app.use(`${version}/did`, didRouter);
 app.use(`${version}/nft`, nftRouter);
+app.use(`${version}/ray`, rayRouter);
 
 // Initial Syncing Service
 const {Syncing} = require('./utils/Syncing');
