@@ -29,26 +29,26 @@ const PATH = {
 
 function deriveSeed(seed, walletIndex, derivationPath, accountIndex) {
   switch (derivationPath) {
-    case DERIVATION_PATH.deprecated:
+    case DERIVATION_PATH.deprecated: {
       const path = `m/501'/${walletIndex}'/0/${accountIndex}`;
       return bip32.fromSeed(seed).derivePath(path).privateKey;
-
-    case DERIVATION_PATH.bip44:
+    }
+    case DERIVATION_PATH.bip44: {
       const path44 = `m/44'/501'/${walletIndex}'`;
       return derivePath(path44, seed).key;
-
-    case DERIVATION_PATH.bip44Change:
+    }
+    case DERIVATION_PATH.bip44Change: {
       const path44Change = `m/44'/501'/${walletIndex}'/0'`;
       return derivePath(path44Change, seed).key;
-
-    case DERIVATION_PATH.cliWallet:
+    }
+    case DERIVATION_PATH.cliWallet: {
       return seed.slice(0, 32);
-
-    case DERIVATION_PATH.test:
+    }
+    case DERIVATION_PATH.test: {
       const pathTest = `m/44'/501'/${accountIndex}'`;
       const hexSeed = Buffer.from(seed).toString('hex');
       return derivePath(pathTest, hexSeed).key;
-
+    }
     default:
       throw new Error(`invalid derivation path: ${derivationPath}`);
   }
@@ -91,12 +91,6 @@ const MINT_LAYOUT = BufferLayout.struct([
   BufferLayout.blob(37),
 ]);
 
-function encodeTokenInstructionData(instruction) {
-  const b = Buffer.alloc(instructionMaxSpan);
-  const span = LAYOUT.encode(instruction, b);
-  return b.slice(0, span);
-}
-
 const LAYOUT = BufferLayout.union(BufferLayout.u8('instruction'));
 LAYOUT.addVariant(
   0,
@@ -133,6 +127,12 @@ const instructionMaxSpan = Math.max(
   ...Object.values(LAYOUT.registry).map((r) => r.span),
 );
 
+function encodeTokenInstructionData(instruction) {
+  const b = Buffer.alloc(instructionMaxSpan);
+  const span = LAYOUT.encode(instruction, b);
+  return b.slice(0, span);
+}
+
 module.exports = {
   toSOL,
   fromSOL,
@@ -144,6 +144,6 @@ module.exports = {
   TOKEN_PROGRAM_ID,
   ACCOUNT_LAYOUT,
   MINT_LAYOUT,
-  encodeTokenInstructionData,
   instructionMaxSpan,
+  encodeTokenInstructionData,
 };
