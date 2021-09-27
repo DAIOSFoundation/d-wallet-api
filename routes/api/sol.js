@@ -21,7 +21,6 @@ router.get('/tokenBalance', mw.solanaNetwork, solController.getTokenBalance);
 router.post(
   '/decodeMnemonic',
   mw.checkMnemonic,
-  mw.solanaNetwork,
   solController.postDecodeMnemonic,
 );
 
