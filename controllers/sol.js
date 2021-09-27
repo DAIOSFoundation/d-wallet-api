@@ -379,7 +379,7 @@ const postDelegate = async (req, res) => {
 
 const postDeactivate = async (req, res) => {
   try {
-    const {fromMnemonic, fromPrivateKey, stakeSecretKey} = req.body;
+    const {fromMnemonic, fromPrivateKey, stakePublicKey} = req.body;
     let from;
     if (fromMnemonic) {
       const seed = bip39.mnemonicToSeedSync(fromMnemonic);
@@ -395,22 +395,19 @@ const postDeactivate = async (req, res) => {
         'input one of fromMnemonic or fromPrivateKey',
       );
     }
-    if (!stakeSecretKey) {
+    if (!stakePublicKey) {
       return cwr.errorWebResp(
         res,
         500,
         `E0000 - postSendSol`,
-        'input stakeSecretKey',
+        'input stakePublicKey',
       );
     }
-    const stakeAccount = Keypair.fromSecretKey(
-      Uint8Array.from(stakeSecretKey.split(',')),
-    );
     const transaction = new Transaction({feePayer: from.publicKey});
     transaction.add(
       StakeProgram.deactivate({
         authorizedPubkey: from.publicKey,
-        stakePubkey: stakeAccount.publicKey,
+        stakePubkey: new PublicKey(stakePublicKey),
         // votePubkey: votePubkey,
       }),
     );
@@ -420,11 +417,7 @@ const postDeactivate = async (req, res) => {
       [from], //
     );
     const tx = await req.connection.getTransaction(signature);
-    const stakeAccountInfo = {
-      publicKey: stakeAccount.publicKey.toString(),
-      secretKey: stakeAccount.secretKey.toString(),
-    };
-    return cwr.createWebResp(res, 200, {stakeAccountInfo, signature, tx});
+    return cwr.createWebResp(res, 200, {signature, tx});
   } catch (e) {
     return cwr.errorWebResp(res, 500, `E0000 - postDeactivate`, e.message);
   }
@@ -432,7 +425,7 @@ const postDeactivate = async (req, res) => {
 
 const postWithdraw = async (req, res) => {
   try {
-    const {fromMnemonic, fromPrivateKey, stakeSecretKey, amount} = req.body;
+    const {fromMnemonic, fromPrivateKey, stakePublicKey, amount} = req.body;
     let from;
     if (fromMnemonic) {
       const seed = bip39.mnemonicToSeedSync(fromMnemonic);
@@ -448,23 +441,21 @@ const postWithdraw = async (req, res) => {
         'input one of fromMnemonic or fromPrivateKey',
       );
     }
-    if (!stakeSecretKey) {
+    if (!stakePublicKey) {
       return cwr.errorWebResp(
         res,
         500,
         `E0000 - postSendSol`,
-        'input stakeSecretKey',
+        'input stakePublicKey',
       );
     }
-    const stakeAccount = Keypair.fromSecretKey(
-      Uint8Array.from(stakeSecretKey.split(',')),
-    );
     const transaction = new Transaction({feePayer: from.publicKey});
+    const lamports = fromSOL(amount);
     transaction.add(
       StakeProgram.withdraw({
         authorizedPubkey: from.publicKey,
-        stakePubkey: stakeAccount.publicKey,
-        lamports: fromSOL(amount),
+        stakePubkey: new PublicKey(stakePublicKey),
+        lamports,
         toPubkey: from.publicKey,
       }),
     );
@@ -474,11 +465,7 @@ const postWithdraw = async (req, res) => {
       [from],
     );
     const tx = await req.connection.getTransaction(signature);
-    const stakeAccountInfo = {
-      publicKey: stakeAccount.publicKey.toString(),
-      secretKey: stakeAccount.secretKey.toString(),
-    };
-    return cwr.createWebResp(res, 200, {stakeAccountInfo, signature, tx});
+    return cwr.createWebResp(res, 200, {signature, tx});
   } catch (e) {
     return cwr.errorWebResp(res, 500, `E0000 - postWithdraw`, e.message);
   }

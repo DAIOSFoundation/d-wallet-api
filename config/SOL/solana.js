@@ -1,6 +1,7 @@
 const {Account, Keypair, PublicKey} = require('@solana/web3.js');
 const bip32 = require('bip32');
 const {derivePath} = require('ed25519-hd-key');
+const BufferLayout = require('buffer-layout');
 
 const toSOL = (value, decimals) => {
   return value / 10 ** (decimals || 9);
@@ -77,6 +78,61 @@ function getKeypairFromSeed(
   return Keypair.fromSeed(derivedSeed);
 }
 
+const ACCOUNT_LAYOUT = BufferLayout.struct([
+  BufferLayout.blob(32, 'mint'),
+  BufferLayout.blob(32, 'owner'),
+  BufferLayout.nu64('amount'),
+  BufferLayout.blob(93),
+]);
+
+const MINT_LAYOUT = BufferLayout.struct([
+  BufferLayout.blob(44),
+  BufferLayout.u8('decimals'),
+  BufferLayout.blob(37),
+]);
+
+function encodeTokenInstructionData(instruction) {
+  const b = Buffer.alloc(instructionMaxSpan);
+  const span = LAYOUT.encode(instruction, b);
+  return b.slice(0, span);
+}
+
+const LAYOUT = BufferLayout.union(BufferLayout.u8('instruction'));
+LAYOUT.addVariant(
+  0,
+  BufferLayout.struct([
+    BufferLayout.u8('decimals'),
+    BufferLayout.blob(32, 'mintAuthority'),
+    BufferLayout.u8('freezeAuthorityOption'),
+    BufferLayout.blob(32, 'freezeAuthority'),
+  ]),
+  'initializeMint',
+);
+LAYOUT.addVariant(1, BufferLayout.struct([]), 'initializeAccount');
+LAYOUT.addVariant(
+  7,
+  BufferLayout.struct([BufferLayout.nu64('amount')]),
+  'mintTo',
+);
+LAYOUT.addVariant(
+  8,
+  BufferLayout.struct([BufferLayout.nu64('amount')]),
+  'burn',
+);
+LAYOUT.addVariant(9, BufferLayout.struct([]), 'closeAccount');
+LAYOUT.addVariant(
+  12,
+  BufferLayout.struct([
+    BufferLayout.nu64('amount'),
+    BufferLayout.u8('decimals'),
+  ]),
+  'transferChecked',
+);
+
+const instructionMaxSpan = Math.max(
+  ...Object.values(LAYOUT.registry).map((r) => r.span),
+);
+
 module.exports = {
   toSOL,
   fromSOL,
@@ -86,4 +142,8 @@ module.exports = {
   getAccountFromSeed,
   getKeypairFromSeed,
   TOKEN_PROGRAM_ID,
+  ACCOUNT_LAYOUT,
+  MINT_LAYOUT,
+  encodeTokenInstructionData,
+  instructionMaxSpan,
 };
