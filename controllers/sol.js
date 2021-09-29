@@ -180,7 +180,7 @@ const postDecodeMnemonic = async (req, res) => {
       wallet[item] = {
         path: PATH[item](walletIndex, accountIndex),
         publicKey: account.publicKey.toString(),
-        privateKey: account.secretKey.toString("hex"),
+        privateKey: account.secretKey.toString('hex'),
         // keypairPublicKey: keypair.publicKey.toString(),
         keypairSecretKey: keypair.secretKey.toString(),
       };
@@ -257,7 +257,7 @@ const postTokenSend = async (req, res) => {
       decimals,
       overrideDestinationCheck,
     } = req.body;
-    const connection = req.connection;
+    const {connection} = req;
 
     let destinationAccountInfo = await connection.getAccountInfo(
       destinationPublicKey,
@@ -318,10 +318,7 @@ const postTokenSend = async (req, res) => {
       decimals,
     });
 
-
-    return cwr.createWebResp(res, 200, {
-
-    });
+    return cwr.createWebResp(res, 200, {});
   } catch (e) {
     return cwr.errorWebResp(res, 500, `E0000 - postTokenSend`, e.message);
   }
@@ -561,7 +558,13 @@ const postWithdraw = async (req, res) => {
 
 const postMintToken = async (req, res) => {
   try {
-    const {ownerPrivateKey, amount, decimals, mintPrivateKey, initialAccountPrivateKey} = req.body;
+    const {
+      ownerPrivateKey,
+      amount,
+      decimals,
+      mintPrivateKey,
+      initialAccountPrivateKey,
+    } = req.body;
     const owner = Keypair.fromSecretKey(
       Uint8Array.from(ownerPrivateKey.split(',')),
     );
@@ -569,10 +572,16 @@ const postMintToken = async (req, res) => {
     let initialAccount;
     const transaction = new Transaction();
     if (mintPrivateKey && initialAccountPrivateKey) {
-      mint = new Account(Keypair.fromSecretKey(
-        Uint8Array.from(mintPrivateKey.split(',')),).secretKey);
-      initialAccount = new Account(Keypair.fromSecretKey(
-        Uint8Array.from(initialAccountPrivateKey.split(',')),).secretKey);
+      mint = new Account(
+        Keypair.fromSecretKey(
+          Uint8Array.from(mintPrivateKey.split(',')),
+        ).secretKey,
+      );
+      initialAccount = new Account(
+        Keypair.fromSecretKey(
+          Uint8Array.from(initialAccountPrivateKey.split(',')),
+        ).secretKey,
+      );
     } else {
       mint = new Account();
       initialAccount = new Account();
@@ -605,7 +614,6 @@ const postMintToken = async (req, res) => {
         }),
       );
     }
-
 
     if (amount > 0) {
       if (!(mintPrivateKey && initialAccountPrivateKey)) {
@@ -710,8 +718,8 @@ const getTokenInfo = async (req, res) => {
     const tokenList = tokenListOnEndpoint.getList();
     const tokenInfo = tokenAddress
       ? tokenList.find((token) => {
-        return token.address === tokenAddress;
-      })
+          return token.address === tokenAddress;
+        })
       : undefined;
     return cwr.createWebResp(res, 200, {
       Strategy: envStrategy[strategy?.toLowerCase()],

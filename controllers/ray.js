@@ -121,11 +121,7 @@ const postStake = async (req, res) => {
 
 const postUnStake = async (req, res) => {
   try {
-    const {
-      walletPrivateKey,
-      amount,
-      fromStakeAccount,
-    } = req.body;
+    const {walletPrivateKey, amount, fromStakeAccount} = req.body;
 
     const wallet = Keypair.fromSecretKey(
       Uint8Array.from(walletPrivateKey.split(',')),
