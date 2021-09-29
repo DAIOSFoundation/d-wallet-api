@@ -50,7 +50,7 @@ const getTrcBalance = async (req, res) => {
       asset.abbr = assetInfo.abbr;
       asset.precision = assetInfo.precision;
     }
-    const mapAssets = assets.sort((a,b) => {return b.value - a.value});
+    const mapAssets = assets.sort((a, b) => b.value - a.value);
     return cwr.createWebResp(res, 200, mapAssets);
   } catch (e) {
     return cwr.errorWebResp(res, 500, `E0000 - getBalance`, e.message);
@@ -79,13 +79,17 @@ const getTronPowerInfo = async (req, res) => {
     const getBandwidth = await req.tronWeb.trx.getBandwidth(address);
     // 해동  불가 72시간 전 상태
     const frozen = accountInfo?.frozen;
-    const frozenBandWidth = frozen.map((item) => {bandWidth: item?.frozen_balance});
-    const frozenEnergyFee = frozen.map((item) => {energyFee: item?.frozen_balance});
+    const frozenBandWidth = frozen.map((item) => item?.frozen_balance);
+    const frozenEnergyFee = frozen.map((item) => item?.frozen_balance);
 
     // 해동 가능 72시간 이후 상태
-    const bandwidth = accountInfo?.account_resource?.frozen_balance_for_energy?.frozen_balance;
+    const bandwidth =
+      accountInfo?.account_resource?.frozen_balance_for_energy?.frozen_balance;
     const energyFee = accountInfo?.frozen[0]?.frozen_balance;
-    return cwr.createWebResp(res, 200, {frozen:{frozenBandWidth, frozenEnergyFee}, available:{bandwidth, energyFee}});
+    return cwr.createWebResp(res, 200, {
+      frozen: {frozenBandWidth, frozenEnergyFee},
+      available: {bandwidth, energyFee},
+    });
   } catch (e) {
     return cwr.errorWebResp(res, 500, `E0000 - getTronPowerInfo`, e.message);
   }
@@ -159,10 +163,12 @@ const postGetReward = async (req, res, next) => {
 const getListWitnesses = async (req, res) => {
   try {
     const SRList = await req.tronWeb.trx.listSuperRepresentatives();
-    const sortSR = SRList.sort((a,b)=>{return b.voteCount -a.voteCount}); // 총 투표율 순 내림차순 정렬
-    /*sortSR.forEach((sr) => {
+    const sortSR = SRList.sort((a, b) => {
+      return b.voteCount - a.voteCount;
+    }); // 총 투표율 순 내림차순 정렬
+    /* sortSR.forEach((sr) => {
       sr.addressBase64 = sr.address.toString();
-    });*/
+    }); */
     return cwr.createWebResp(res, 200, sortSR);
   } catch (e) {
     return cwr.errorWebResp(res, 500, `E0000 - getListWitnesses`, e.message);
@@ -210,12 +216,7 @@ const postRewardBalance = async (req, res) => {
     const getReward = await req.tronWeb.trx.getReward(address);
     return cwr.createWebResp(res, 200, getReward);
   } catch (e) {
-    return cwr.errorWebResp(
-      res,
-      500,
-      `E0000 - postRewardBalance`,
-      e.message,
-    );
+    return cwr.errorWebResp(res, 500, `E0000 - postRewardBalance`, e.message);
   }
 };
 

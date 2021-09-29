@@ -1,8 +1,15 @@
-const {Account, Keypair, PublicKey, TransactionInstruction, Transaction, SystemProgram} = require('@solana/web3.js');
+const {
+  Account,
+  Keypair,
+  PublicKey,
+  TransactionInstruction,
+  Transaction,
+  SystemProgram,
+} = require('@solana/web3.js');
 const bip32 = require('bip32');
 const {derivePath} = require('ed25519-hd-key');
 const BufferLayout = require('buffer-layout');
-const { TokenInstructions } = require('@project-serum/serum');
+const {TokenInstructions} = require('@project-serum/serum');
 
 const toSOL = (value, decimals) => {
   return value / 10 ** (decimals || 9);
@@ -24,16 +31,16 @@ const PATH = {
     return `m/501'/${walletIndex}'/0/${accountIndex}`;
   },
   bip44: (walletIndex, accountIndex) => {
-    return `m/44'/501'/${walletIndex}'`
+    return `m/44'/501'/${walletIndex}'`;
   },
   bip44Change: (walletIndex, accountIndex) => {
-    return `m/44'/501'/${walletIndex}'/0'`
+    return `m/44'/501'/${walletIndex}'/0'`;
   },
   cliWallet: (walletIndex, accountIndex) => {
-    return 'undefined'
+    return 'undefined';
   },
   Phantom: (walletIndex, accountIndex) => {
-    return `m/44'/501'/0'/${accountIndex}`
+    return `m/44'/501'/0'/${accountIndex}`;
   },
   // bip44Root: 'bip44Root', // Ledger only.
 };
@@ -57,7 +64,7 @@ function deriveSeed(seed, walletIndex, derivationPath, accountIndex) {
     }
     case DERIVATION_PATH.Phantom: {
       const pathPhantom = `m/44'/501'/0'/${accountIndex}`;
-      //const hexSeed = Buffer.from(seed).toString('hex');
+      // const hexSeed = Buffer.from(seed).toString('hex');
       return bip32.fromSeed(seed).derivePath(pathPhantom).privateKey;
     }
     default:
@@ -144,17 +151,16 @@ function encodeTokenInstructionData(instruction) {
   return b.slice(0, span);
 }
 
-
 const transferBetweenSplTokenAccounts = async ({
-                                                 connection,
-                                                 owner,
-                                                 mint,
-                                                 decimals,
-                                                 sourcePublicKey,
-                                                 destinationPublicKey,
-                                                 amount,
-                                                 memo,
-                                               }) => {
+  connection,
+  owner,
+  mint,
+  decimals,
+  sourcePublicKey,
+  destinationPublicKey,
+  amount,
+  memo,
+}) => {
   const transaction = createTransferBetweenSplTokenAccountsInstruction({
     ownerPublicKey: owner.publicKey,
     mint,
@@ -164,12 +170,19 @@ const transferBetweenSplTokenAccounts = async ({
     amount,
     memo,
   });
-  let signers = [];
+  const signers = [];
   return await signAndSendTransaction(connection, transaction, owner, signers);
 };
 
-const transferChecked = ({source, mint, destination, amount, decimals, owner}) => {
-  let keys = [
+const transferChecked = ({
+  source,
+  mint,
+  destination,
+  amount,
+  decimals,
+  owner,
+}) => {
+  const keys = [
     {pubkey: source, isSigner: false, isWritable: true},
     {pubkey: mint, isSigner: false, isWritable: false},
     {pubkey: destination, isSigner: false, isWritable: true},
@@ -182,7 +195,7 @@ const transferChecked = ({source, mint, destination, amount, decimals, owner}) =
     }),
     programId: TOKEN_PROGRAM_ID,
   });
-}
+};
 
 const MEMO_PROGRAM_ID = new PublicKey(
   'Memo1UhkJRfHyvLMcVucJwxXeuD728EqVDDwQDxFMNo',
@@ -198,7 +211,7 @@ const memoInstruction = (memo) => {
     data: Buffer.from(memo, 'utf-8'),
     programId: MEMO_PROGRAM_ID,
   });
-}
+};
 
 async function signAndSendTransaction(
   connection,
@@ -243,7 +256,6 @@ async function findAssociatedTokenAddressfindAssociatedTokenAddress(
     )
   )[0];
 }
-
 
 async function createAssociatedTokenAccountIx(
   fundingAddress,
@@ -332,34 +344,32 @@ function encodeOwnerValidationInstruction(instruction) {
   return b.slice(0, span);
 }
 
-function assertOwner({ account, owner }) {
-  const keys = [{ pubkey: account, isSigner: false, isWritable: false }];
+function assertOwner({account, owner}) {
+  const keys = [{pubkey: account, isSigner: false, isWritable: false}];
   return new TransactionInstruction({
     keys,
-    data: encodeOwnerValidationInstruction({ account: owner }),
+    data: encodeOwnerValidationInstruction({account: owner}),
     programId: OWNER_VALIDATION_PROGRAM_ID,
   });
 }
 
 async function createAndTransferToAccount({
-                                            connection,
-                                            owner,
-                                            sourcePublicKey,
-                                            destinationPublicKey,
-                                            amount,
-                                            memo,
-                                            mint,
-                                            decimals,
-                                          }) {
-  const [
-    createAccountInstruction,
-    newAddress,
-  ] = await createAssociatedTokenAccountIx(
-    owner.publicKey,
-    destinationPublicKey,
-    mint,
-  );
-  let transaction = new Transaction();
+  connection,
+  owner,
+  sourcePublicKey,
+  destinationPublicKey,
+  amount,
+  memo,
+  mint,
+  decimals,
+}) {
+  const [createAccountInstruction, newAddress] =
+    await createAssociatedTokenAccountIx(
+      owner.publicKey,
+      destinationPublicKey,
+      mint,
+    );
+  const transaction = new Transaction();
   transaction.add(
     assertOwner({
       account: destinationPublicKey,
@@ -367,8 +377,8 @@ async function createAndTransferToAccount({
     }),
   );
   transaction.add(createAccountInstruction);
-  const transferBetweenAccountsTxn = createTransferBetweenSplTokenAccountsInstruction(
-    {
+  const transferBetweenAccountsTxn =
+    createTransferBetweenSplTokenAccountsInstruction({
       ownerPublicKey: owner.publicKey,
       mint,
       decimals,
@@ -376,10 +386,9 @@ async function createAndTransferToAccount({
       destinationPublicKey: newAddress,
       amount,
       memo,
-    },
-  );
+    });
   transaction.add(transferBetweenAccountsTxn);
-  let signers = [];
+  const signers = [];
   return await signAndSendTransaction(connection, transaction, owner, signers);
 }
 
