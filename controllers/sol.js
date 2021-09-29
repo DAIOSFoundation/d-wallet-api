@@ -182,7 +182,7 @@ const postDecodeMnemonic = async (req, res) => {
         publicKey: account.publicKey.toString(),
         privateKey: account.secretKey.toString("hex"),
         // keypairPublicKey: keypair.publicKey.toString(),
-        keypairSecertKey: keypair.secretKey.toString(),
+        keypairSecretKey: keypair.secretKey.toString(),
       };
     }
     return cwr.createWebResp(res, 200, wallet);
