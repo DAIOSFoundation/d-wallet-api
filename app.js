@@ -41,6 +41,7 @@ checkEnv([
   'IPFS_NODE_PATH_BIO',
   'DID_ASSET_CODE',
   'DID_ASSET_PUBLIC',
+  'SOL_API_KEY',
 ]);
 
 const createError = require('http-errors');

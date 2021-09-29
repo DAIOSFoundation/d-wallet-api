@@ -1,6 +1,5 @@
 version: '3.8'
 services:
-
   d-wallet-api:
     image: asia.gcr.io/blockchain-289901/d-wallet-api:latest
     container_name: d-wallet-api
