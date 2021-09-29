@@ -8,10 +8,11 @@
   },
   "dependencies": {
     "@aave/protocol-js": "^3.1.0",
+    "@project-serum/borsh": "^0.2.2",
+    "@project-serum/serum": "^0.13.60",
     "@solana/spl-token": "^0.1.8",
     "@solana/spl-token-registry": "^0.2.268",
     "@solana/web3.js": "^1.29.1",
-    "@project-serum/borsh": "^0.2.2",
     "axios": "^0.21.4",
     "bip32": "^2.0.6",
     "bip39": "^3.0.4",

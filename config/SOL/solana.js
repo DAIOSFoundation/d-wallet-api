@@ -1,7 +1,8 @@
-const {Account, Keypair, PublicKey} = require('@solana/web3.js');
+const {Account, Keypair, PublicKey, TransactionInstruction, Transaction, SystemProgram} = require('@solana/web3.js');
 const bip32 = require('bip32');
 const {derivePath} = require('ed25519-hd-key');
 const BufferLayout = require('buffer-layout');
+const { TokenInstructions } = require('@project-serum/serum');
 
 const toSOL = (value, decimals) => {
   return value / 10 ** (decimals || 9);
@@ -19,11 +20,21 @@ const DERIVATION_PATH = {
   // bip44Root: 'bip44Root', // Ledger only.
 };
 const PATH = {
-  deprecated: `m/501'/walletIndex'/0/accountIndex`,
-  bip44: `m/44'/501'/walletIndex'`,
-  bip44Change: `m/44'/501'/walletIndex'/0'`,
-  cliWallet: 'undefined',
-  test: `m/44'/501'/accountIndex'`,
+  deprecated: (walletIndex, accountIndex) => {
+    return `m/501'/${walletIndex}'/0/${accountIndex}`;
+  },
+  bip44: (walletIndex, accountIndex) => {
+    return `m/44'/501'/${walletIndex}'`
+  },
+  bip44Change: (walletIndex, accountIndex) => {
+    return `m/44'/501'/${walletIndex}'/0'`
+  },
+  cliWallet: (walletIndex, accountIndex) => {
+    return 'undefined'
+  },
+  test: (walletIndex, accountIndex) => {
+    return `m/44'/501'/${accountIndex}'`
+  },
   // bip44Root: 'bip44Root', // Ledger only.
 };
 
@@ -133,6 +144,245 @@ function encodeTokenInstructionData(instruction) {
   return b.slice(0, span);
 }
 
+
+const transferBetweenSplTokenAccounts = async ({
+                                                 connection,
+                                                 owner,
+                                                 mint,
+                                                 decimals,
+                                                 sourcePublicKey,
+                                                 destinationPublicKey,
+                                                 amount,
+                                                 memo,
+                                               }) => {
+  const transaction = createTransferBetweenSplTokenAccountsInstruction({
+    ownerPublicKey: owner.publicKey,
+    mint,
+    decimals,
+    sourcePublicKey,
+    destinationPublicKey,
+    amount,
+    memo,
+  });
+  let signers = [];
+  return await signAndSendTransaction(connection, transaction, owner, signers);
+};
+
+const transferChecked = ({source, mint, destination, amount, decimals, owner}) => {
+  let keys = [
+    {pubkey: source, isSigner: false, isWritable: true},
+    {pubkey: mint, isSigner: false, isWritable: false},
+    {pubkey: destination, isSigner: false, isWritable: true},
+    {pubkey: owner, isSigner: true, isWritable: false},
+  ];
+  return new TransactionInstruction({
+    keys,
+    data: encodeTokenInstructionData({
+      transferChecked: {amount, decimals},
+    }),
+    programId: TOKEN_PROGRAM_ID,
+  });
+}
+
+const MEMO_PROGRAM_ID = new PublicKey(
+  'Memo1UhkJRfHyvLMcVucJwxXeuD728EqVDDwQDxFMNo',
+);
+
+const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey(
+  'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
+);
+
+const memoInstruction = (memo) => {
+  return new TransactionInstruction({
+    keys: [],
+    data: Buffer.from(memo, 'utf-8'),
+    programId: MEMO_PROGRAM_ID,
+  });
+}
+
+async function signAndSendTransaction(
+  connection,
+  transaction,
+  wallet,
+  signers,
+  skipPreflight = false,
+) {
+  transaction.recentBlockhash = (
+    await connection.getRecentBlockhash('max')
+  ).blockhash;
+  transaction.setSigners(
+    // fee payed by the wallet owner
+    wallet.publicKey,
+    ...signers.map((s) => s.publicKey),
+  );
+
+  if (signers.length > 0) {
+    transaction.partialSign(...signers);
+  }
+
+  transaction = await wallet.signTransaction(transaction);
+  const rawTransaction = transaction.serialize();
+  return await connection.sendRawTransaction(rawTransaction, {
+    skipPreflight,
+    preflightCommitment: 'single',
+  });
+}
+
+async function findAssociatedTokenAddressfindAssociatedTokenAddress(
+  walletAddress,
+  tokenMintAddress,
+) {
+  return (
+    await PublicKey.findProgramAddress(
+      [
+        walletAddress.toBuffer(),
+        TokenInstructions.TOKEN_PROGRAM_ID.toBuffer(),
+        tokenMintAddress.toBuffer(),
+      ],
+      ASSOCIATED_TOKEN_PROGRAM_ID,
+    )
+  )[0];
+}
+
+
+async function createAssociatedTokenAccountIx(
+  fundingAddress,
+  walletAddress,
+  splTokenMintAddress,
+) {
+  const associatedTokenAddress = await findAssociatedTokenAddress(
+    walletAddress,
+    splTokenMintAddress,
+  );
+  const systemProgramId = new PublicKey('11111111111111111111111111111111');
+  const keys = [
+    {
+      pubkey: fundingAddress,
+      isSigner: true,
+      isWritable: true,
+    },
+    {
+      pubkey: associatedTokenAddress,
+      isSigner: false,
+      isWritable: true,
+    },
+    {
+      pubkey: walletAddress,
+      isSigner: false,
+      isWritable: false,
+    },
+    {
+      pubkey: splTokenMintAddress,
+      isSigner: false,
+      isWritable: false,
+    },
+    {
+      pubkey: systemProgramId,
+      isSigner: false,
+      isWritable: false,
+    },
+    {
+      pubkey: TokenInstructions.TOKEN_PROGRAM_ID,
+      isSigner: false,
+      isWritable: false,
+    },
+    {
+      pubkey: SYSVAR_RENT_PUBKEY,
+      isSigner: false,
+      isWritable: false,
+    },
+  ];
+  const ix = new TransactionInstruction({
+    keys,
+    programId: ASSOCIATED_TOKEN_PROGRAM_ID,
+    data: Buffer.from([]),
+  });
+  return [ix, associatedTokenAddress];
+}
+
+const OWNER_VALIDATION_PROGRAM_ID = new PublicKey(
+  '4MNPdKu9wFMvEeZBMt3Eipfs5ovVWTJb31pEXDJAAxX5',
+);
+
+class PublicKeyLayout extends BufferLayout.Blob {
+  constructor(property) {
+    super(32, property);
+  }
+
+  decode(b, offset) {
+    return new PublicKey(super.decode(b, offset));
+  }
+
+  encode(src, b, offset) {
+    return super.encode(src.toBuffer(), b, offset);
+  }
+}
+
+function publicKeyLayout(property) {
+  return new PublicKeyLayout(property);
+}
+
+const OWNER_VALIDATION_LAYOUT = BufferLayout.struct([
+  publicKeyLayout('account'),
+]);
+
+function encodeOwnerValidationInstruction(instruction) {
+  const b = Buffer.alloc(OWNER_VALIDATION_LAYOUT.span);
+  const span = OWNER_VALIDATION_LAYOUT.encode(instruction, b);
+  return b.slice(0, span);
+}
+
+function assertOwner({ account, owner }) {
+  const keys = [{ pubkey: account, isSigner: false, isWritable: false }];
+  return new TransactionInstruction({
+    keys,
+    data: encodeOwnerValidationInstruction({ account: owner }),
+    programId: OWNER_VALIDATION_PROGRAM_ID,
+  });
+}
+
+async function createAndTransferToAccount({
+                                            connection,
+                                            owner,
+                                            sourcePublicKey,
+                                            destinationPublicKey,
+                                            amount,
+                                            memo,
+                                            mint,
+                                            decimals,
+                                          }) {
+  const [
+    createAccountInstruction,
+    newAddress,
+  ] = await createAssociatedTokenAccountIx(
+    owner.publicKey,
+    destinationPublicKey,
+    mint,
+  );
+  let transaction = new Transaction();
+  transaction.add(
+    assertOwner({
+      account: destinationPublicKey,
+      owner: SystemProgram.programId,
+    }),
+  );
+  transaction.add(createAccountInstruction);
+  const transferBetweenAccountsTxn = createTransferBetweenSplTokenAccountsInstruction(
+    {
+      ownerPublicKey: owner.publicKey,
+      mint,
+      decimals,
+      sourcePublicKey,
+      destinationPublicKey: newAddress,
+      amount,
+      memo,
+    },
+  );
+  transaction.add(transferBetweenAccountsTxn);
+  let signers = [];
+  return await signAndSendTransaction(connection, transaction, owner, signers);
+}
+
 module.exports = {
   toSOL,
   fromSOL,
@@ -146,4 +396,9 @@ module.exports = {
   MINT_LAYOUT,
   instructionMaxSpan,
   encodeTokenInstructionData,
+  transferChecked,
+  memoInstruction,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  transferBetweenSplTokenAccounts,
+  createAndTransferToAccount,
 };

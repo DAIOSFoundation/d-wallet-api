@@ -10,16 +10,25 @@ const {
   USER_STAKE_INFO_ACCOUNT_LAYOUT,
   depositInstruction,
   createProgramAccountIfNotExist,
-  farmInfo,
   withdrawInstruction,
+  FARMS,
+  lt,
+  TokenAmount,
+  STAKE_PROGRAM_ID,
+  STAKE_PROGRAM_ID_V4,
+  STAKE_PROGRAM_ID_V5,
+  getInfoAccount,
 } = require('../config/SOL/raydium');
 
 const postStake = async (req, res) => {
   try {
-    const {walletPrivateKey, infoAccount, amount} = req.body;
+    const {walletPrivateKey, amount, toStakeAccount} = req.body;
     const wallet = Keypair.fromSecretKey(
       Uint8Array.from(walletPrivateKey.split(',')),
     );
+    const farmInfo = FARMS.find((farm) => {
+      return farm.name === 'RAY';
+    });
     const filter = {mint: new PublicKey(farmInfo.lp.mintAddress)};
     const resp = await req.connection.getParsedTokenAccountsByOwner(
       wallet.publicKey,
@@ -36,6 +45,19 @@ const postStake = async (req, res) => {
         },
       }),
     );
+    let infoAccount;
+    if (!toStakeAccount) {
+      infoAccount = await getInfoAccount(wallet.publicKey, req.connection);
+      infoAccount = infoAccount.find((item) => {
+        return item.poolId === farmInfo.poolId;
+      });
+      if (!infoAccount) {
+        const message = `RAY 스테이킹 계좌를 찾을 수 없습니다. 관리자에게 문의하세요....`;
+        return cwr.errorWebResp(res, 500, `E0000 - postUnstake`, message);
+      }
+    } else {
+      infoAccount = {publicKey: new PublicKey(toStakeAccount)};
+    }
     const lpAccount =
       result.length === 1 ? result[0].publicKey.toString() : undefined;
     const rewardAccount = lpAccount;
@@ -60,7 +82,7 @@ const postStake = async (req, res) => {
     const programId = new PublicKey(farmInfo.programId);
     const userInfoAccount = await createProgramAccountIfNotExist(
       req.connection,
-      infoAccount,
+      infoAccount.publicKey,
       owner,
       programId,
       null,
@@ -100,23 +122,17 @@ const postStake = async (req, res) => {
 const postUnStake = async (req, res) => {
   try {
     const {
-      // connection,
-      // wallet,
       walletPrivateKey,
-      // farmInfo,
-      // lpAccount,
-      // rewardAccount,
-      infoAccount,
       amount,
+      fromStakeAccount,
     } = req.body;
-    // if (!connection || !wallet) throw new Error('Miss connection')
-    // if (!farmInfo) throw new Error('Miss pool infomations')
-    // if (!infoAccount) throw new Error('Miss account infomations')
-    // if (!amount) throw new Error('Miss amount infomations')
 
     const wallet = Keypair.fromSecretKey(
       Uint8Array.from(walletPrivateKey.split(',')),
     );
+    const farmInfo = FARMS.find((farm) => {
+      return farm.name === 'RAY';
+    });
     const filter = {mint: new PublicKey(farmInfo.lp.mintAddress)};
     const resp = await req.connection.getParsedTokenAccountsByOwner(
       wallet.publicKey,
@@ -133,6 +149,19 @@ const postUnStake = async (req, res) => {
         },
       }),
     );
+    let infoAccount;
+    if (!fromStakeAccount) {
+      infoAccount = await getInfoAccount(wallet.publicKey, req.connection);
+      infoAccount = infoAccount.find((item) => {
+        return item.poolId === farmInfo.poolId;
+      });
+      if (!infoAccount) {
+        const message = `RAY 스테이킹 계좌를 찾을 수 없습니다. 관리자에게 문의하세요....`;
+        return cwr.errorWebResp(res, 500, `E0000 - postUnstake`, message);
+      }
+    } else {
+      infoAccount = {publicKey: new PublicKey(fromStakeAccount)};
+    }
     const lpAccount =
       result.length === 1 ? result[0].publicKey.toString() : undefined;
     const rewardAccount = lpAccount;
@@ -151,8 +180,6 @@ const postUnStake = async (req, res) => {
       transaction,
       atas,
     );
-
-    // if no account, create new one
     const userRewardTokenAccount = await createAssociatedTokenAccountIfNotExist(
       rewardAccount,
       owner,
@@ -162,14 +189,13 @@ const postUnStake = async (req, res) => {
     );
 
     const programId = new PublicKey(farmInfo.programId);
-    // const value = getBigNumber(new TokenAmount(amount, farmInfo.lp.decimals, false).wei)
 
     transaction.add(
       withdrawInstruction(
         programId,
         new PublicKey(farmInfo.poolId),
         new PublicKey(farmInfo.poolAuthority),
-        new PublicKey(infoAccount),
+        infoAccount.publicKey,
         wallet.publicKey,
         userLpAccount,
         new PublicKey(farmInfo.poolLpTokenAccount),
@@ -196,16 +222,20 @@ const postUnStake = async (req, res) => {
   }
 };
 
-const getRewardBalance = async (req, res) => {
+const getStakeAccounts = async (req, res) => {
   try {
-    return cwr.createWebResp(res, 200, {});
+    const {address} = req.query;
+    const result = await getInfoAccount(address, req.connection);
+    return cwr.createWebResp(res, 200, {
+      result,
+    });
   } catch (e) {
-    return cwr.errorWebResp(res, 500, `E0000 - getRewardBalance`, e.message);
+    return cwr.errorWebResp(res, 500, `E0000 - postStakeAccount`, e.message);
   }
 };
 
 module.exports = {
   postStake,
   postUnStake,
-  getRewardBalance,
+  getStakeAccounts,
 };

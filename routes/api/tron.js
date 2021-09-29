@@ -41,8 +41,7 @@ router.post(
 router.post(
   '/getReward',
   mw.tronNetwork,
-  tronController.postGetReward,
-  tronController.tronSendRawTransaction,
+  tronController.postGetReward
 );
 
 router.post(
@@ -53,9 +52,9 @@ router.post(
 );
 
 router.post(
-  '/withdrawBalance',
+  '/rewardBalance',
   mw.tronNetwork,
-  tronController.postWithdrawBalance,
+  tronController.postRewardBalance,
 );
 
 module.exports = router;

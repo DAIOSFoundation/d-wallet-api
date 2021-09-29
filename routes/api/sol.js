@@ -21,11 +21,12 @@ router.get('/tokenBalance', mw.solanaNetwork, solController.getTokenBalance);
 router.post(
   '/decodeMnemonic',
   mw.checkMnemonic,
-  mw.solanaNetwork,
   solController.postDecodeMnemonic,
 );
 
 router.post('/send', mw.solanaNetwork, solController.postSend);
+
+router.post('/tokenSend', mw.solanaNetwork, solController.postTokenSend);
 
 router.get('/validatorList', solController.getValidatorList);
 
@@ -52,7 +53,7 @@ router.post(
   solController.postDeactivate,
 );
 
-router.post('/privToPub', mw.solanaNetwork, solController.postPrivToPubkey);
+router.post('/privateKeyToPublicKey', solController.postPrivateKeyToPublicKey);
 
 router.post(
   '/withdraw',

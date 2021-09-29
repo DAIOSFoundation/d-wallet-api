@@ -41,8 +41,17 @@ const postSendTrx = async (req, res) => {
 const getTrcBalance = async (req, res) => {
   try {
     const {address} = req.query;
-    const balance = await req.tronWeb.trx.getBalance(address);
-    return cwr.createWebResp(res, 200, balance);
+    const accountInfo = await req.tronWeb.trx.getAccount(address);
+    const assets = accountInfo?.assetV2;
+    for (const asset of assets) {
+      const assetInfo = await req.tronWeb.trx.getTokenFromID(asset.key);
+      asset.owner_address = assetInfo.owner_address;
+      asset.name = assetInfo.name;
+      asset.abbr = assetInfo.abbr;
+      asset.precision = assetInfo.precision;
+    }
+    const mapAssets = assets.sort((a,b) => {return b.value - a.value});
+    return cwr.createWebResp(res, 200, mapAssets);
   } catch (e) {
     return cwr.errorWebResp(res, 500, `E0000 - getBalance`, e.message);
   }
@@ -66,9 +75,17 @@ const postSendTrc = async (req, res) => {
 const getTronPowerInfo = async (req, res) => {
   try {
     const {address} = req.query;
-    const bandwidth = await req.tronWeb.trx.getBandwidth(address);
-    const energyFee = await req.tronWeb.trx.getEnergy(address);
-    return cwr.createWebResp(res, 200, {bandwidth, energyFee});
+    const accountInfo = await req.tronWeb.trx.getAccount(address);
+    const getBandwidth = await req.tronWeb.trx.getBandwidth(address);
+    // 해동  불가 72시간 전 상태
+    const frozen = accountInfo?.frozen;
+    const frozenBandWidth = frozen.map((item) => {bandWidth: item?.frozen_balance});
+    const frozenEnergyFee = frozen.map((item) => {energyFee: item?.frozen_balance});
+
+    // 해동 가능 72시간 이후 상태
+    const bandwidth = accountInfo?.account_resource?.frozen_balance_for_energy?.frozen_balance;
+    const energyFee = accountInfo?.frozen[0]?.frozen_balance;
+    return cwr.createWebResp(res, 200, {frozen:{frozenBandWidth, frozenEnergyFee}, available:{bandwidth, energyFee}});
   } catch (e) {
     return cwr.errorWebResp(res, 500, `E0000 - getTronPowerInfo`, e.message);
   }
@@ -142,7 +159,11 @@ const postGetReward = async (req, res, next) => {
 const getListWitnesses = async (req, res) => {
   try {
     const SRList = await req.tronWeb.trx.listSuperRepresentatives();
-    return cwr.createWebResp(res, 200, SRList);
+    const sortSR = SRList.sort((a,b)=>{return b.voteCount -a.voteCount}); // 총 투표율 순 내림차순 정렬
+    /*sortSR.forEach((sr) => {
+      sr.addressBase64 = sr.address.toString();
+    });*/
+    return cwr.createWebResp(res, 200, sortSR);
   } catch (e) {
     return cwr.errorWebResp(res, 500, `E0000 - getListWitnesses`, e.message);
   }
@@ -183,29 +204,18 @@ const getLatestBlock = async (req, res) => {
   }
 };
 
-const postWithdrawBalance = async (req, res) => {
+const postRewardBalance = async (req, res) => {
   try {
-    const {owner_address} = req.body;
-    const url = 'https://api.shasta.trongrid.io/wallet/withdrawbalance';
-    const options = {
-      method: 'POST',
-      headers: {Accept: 'application/json', 'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        owner_address,
-        visible: true,
-      }),
-    };
-
-    const result = await fetch(url, options);
-    const data = await result.json();
-
-    return cwr.createWebResp(res, 200, data);
+    const {address} = req.body;
+    const getReward = await req.tronWeb.trx.getReward(address);
+    return cwr.createWebResp(res, 200, getReward);
   } catch (e) {
-    const result = fetch(url, options)
-      .then((res) => res.json())
-      .then((json) => winston.log.info(json))
-      .catch((err) => winston.log.error(`error:${err}`));
-    return cwr.createWebResp(res, 200, true);
+    return cwr.errorWebResp(
+      res,
+      500,
+      `E0000 - postRewardBalance`,
+      e.message,
+    );
   }
 };
 
@@ -242,7 +252,7 @@ module.exports = {
   getCheckNetworkStatus,
   getLatestBlock,
   getAccountInfo,
-  postWithdrawBalance,
+  postRewardBalance,
   getTronPowerInfo,
   getBalance,
   postSendTrx,

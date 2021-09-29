@@ -13,6 +13,7 @@ const stellarConfig = require('../config/XLM/stellar');
 const eth = require('../config/ETH/eth');
 const aave = require('../config/AAVE/aave');
 const {etherscanWebUrl} = require('../config/ETH/eth');
+const axios = require("axios");
 
 /// /////////////////// Middleware for XLM //////////////////////
 const isValidMnemonic = async (req, res, next) => {
@@ -238,9 +239,13 @@ const btcLastBlockHash = async (req, res, next) => {
 const solanaNetwork = async (req, res, next) => {
   try {
     req.network = req.body.network || req.query.network;
+    if(!req.network)
+    {
+      throw "req.network is not supported!!";
+    }
     req.web3 = solanaWeb3;
     req.endpoint = req.web3.clusterApiUrl(req.network);
-    req.connection = new req.web3.Connection(req.endpoint, 'confirmed');
+    req.connection = new req.web3.Connection(req.endpoint /* , 'confirmed' */);
     next();
   } catch (e) {
     return cwr.errorWebResp(res, 500, `E0000 - solanaNetwork`, e.message);
@@ -331,6 +336,20 @@ const multerInitialize = async (req, res, next) => {
 };
 
 const upload = multer({storage});
+
+const getPriceFromWeb = async (req, res) => {
+  try {
+    const {market} = req.query;
+    const upbitURL = 'https://api.upbit.com/v1/ticker?markets=' + market;
+    const upbitResponse = await axios.get(upbitURL);
+
+    return cwr.createWebResp(res, 200, {
+      upbitResponse,
+    });
+  } catch (e) {
+    return cwr.errorWebResp(res, 500, `E0000 - getPriceFromWeb`, e.message);
+  }
+};
 
 module.exports = {
   isValidMnemonic,

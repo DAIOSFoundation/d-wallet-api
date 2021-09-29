@@ -27,6 +27,12 @@ const {
   MINT_LAYOUT,
   ACCOUNT_LAYOUT,
   encodeTokenInstructionData,
+  transferChecked,
+  memoInstruction,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  transferBetweenSplTokenAccounts,
+  findAssociatedTokenAddress,
+  createAndTransferToAccount,
 } = require('../config/SOL/solana');
 
 const getBalance = async (req, res) => {
@@ -172,9 +178,9 @@ const postDecodeMnemonic = async (req, res) => {
         accountIndex,
       );
       wallet[item] = {
-        path: PATH[item],
+        path: PATH[item](walletIndex, accountIndex),
         publicKey: account.publicKey.toString(),
-        privateKey: account.secretKey.toString('hex'),
+        privateKey: account.secretKey.toString("hex"),
         // keypairPublicKey: keypair.publicKey.toString(),
         keypairSecertKey: keypair.secretKey.toString(),
       };
@@ -185,7 +191,7 @@ const postDecodeMnemonic = async (req, res) => {
   }
 };
 
-const postPrivToPubkey = async (req, res) => {
+const postPrivateKeyToPublicKey = async (req, res) => {
   try {
     const {privateKey} = req.body;
     const keypair = Keypair.fromSecretKey(
@@ -236,6 +242,88 @@ const postSend = async (req, res) => {
     return cwr.createWebResp(res, 200, {signature, tx});
   } catch (e) {
     return cwr.errorWebResp(res, 500, `E0000 - postSendSol`, e.message);
+  }
+};
+
+const postTokenSend = async (req, res) => {
+  try {
+    const {
+      owner,
+      sourcePublicKey,
+      destinationPublicKey,
+      amount,
+      memo,
+      mint,
+      decimals,
+      overrideDestinationCheck,
+    } = req.body;
+    const connection = req.connection;
+
+    let destinationAccountInfo = await connection.getAccountInfo(
+      destinationPublicKey,
+    );
+    if (
+      !!destinationAccountInfo &&
+      destinationAccountInfo.owner.equals(TOKEN_PROGRAM_ID)
+    ) {
+      return await transferBetweenSplTokenAccounts({
+        connection,
+        owner,
+        mint,
+        decimals,
+        sourcePublicKey,
+        destinationPublicKey,
+        amount,
+        memo,
+      });
+    }
+
+    if (
+      (!destinationAccountInfo || destinationAccountInfo.lamports === 0) &&
+      !overrideDestinationCheck
+    ) {
+      throw new Error('Cannot send to address with zero SOL balances');
+    }
+
+    const destinationAssociatedTokenAddress = await findAssociatedTokenAddress(
+      destinationPublicKey,
+      mint,
+    );
+    destinationAccountInfo = await req.connection.getAccountInfo(
+      destinationAssociatedTokenAddress,
+    );
+    if (
+      !!destinationAccountInfo &&
+      destinationAccountInfo.owner.equals(TOKEN_PROGRAM_ID)
+    ) {
+      return await transferBetweenSplTokenAccounts({
+        connection,
+        owner,
+        mint,
+        decimals,
+        sourcePublicKey,
+        destinationPublicKey: destinationAssociatedTokenAddress,
+        amount,
+        memo,
+      });
+    }
+    return await createAndTransferToAccount({
+      connection,
+      owner,
+      sourcePublicKey,
+      destinationPublicKey,
+      amount,
+      memo,
+      mint,
+      decimals,
+    });
+
+
+    return cwr.createWebResp(res, 200, {
+
+    });
+  } catch (e) {
+    return cwr.errorWebResp(res, 500, `E0000 - postTokenSend`, e.message);
   }
 };
 
@@ -473,72 +561,84 @@ const postWithdraw = async (req, res) => {
 
 const postMintToken = async (req, res) => {
   try {
-    const {ownerPrivateKey, amount, decimals} = req.body;
+    const {ownerPrivateKey, amount, decimals, mintPrivateKey, initialAccountPrivateKey} = req.body;
     const owner = Keypair.fromSecretKey(
       Uint8Array.from(ownerPrivateKey.split(',')),
     );
-    const mint = new Account();
-    const initialAccount = new Account();
-
+    let mint;
+    let initialAccount;
     const transaction = new Transaction();
-    transaction.add(
-      SystemProgram.createAccount({
-        fromPubkey: owner.publicKey,
-        newAccountPubkey: mint.publicKey,
-        lamports: await req.connection.getMinimumBalanceForRentExemption(
-          MINT_LAYOUT.span,
-        ),
-        space: MINT_LAYOUT.span,
-        programId: TOKEN_PROGRAM_ID,
-      }),
-    );
-    transaction.add(
-      new TransactionInstruction({
-        keys: [
-          {pubkey: mint.publicKey, isSigner: false, isWritable: true},
-          {pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false},
-        ],
-        data: encodeTokenInstructionData({
-          initializeMint: {
-            decimals,
-            mintAuthority: owner.publicKey.toBuffer(),
-            freezeAuthorityOption: false,
-            freezeAuthority: PublicKey.default.toBuffer(),
-          },
-        }),
-        programId: TOKEN_PROGRAM_ID,
-      }),
-    );
-    if (amount > 0) {
+    if (mintPrivateKey && initialAccountPrivateKey) {
+      mint = new Account(Keypair.fromSecretKey(
+        Uint8Array.from(mintPrivateKey.split(',')),).secretKey);
+      initialAccount = new Account(Keypair.fromSecretKey(
+        Uint8Array.from(initialAccountPrivateKey.split(',')),).secretKey);
+    } else {
+      mint = new Account();
+      initialAccount = new Account();
       transaction.add(
         SystemProgram.createAccount({
           fromPubkey: owner.publicKey,
-          newAccountPubkey: initialAccount.publicKey,
+          newAccountPubkey: mint.publicKey,
           lamports: await req.connection.getMinimumBalanceForRentExemption(
-            ACCOUNT_LAYOUT.span,
+            MINT_LAYOUT.span,
           ),
-          space: ACCOUNT_LAYOUT.span,
+          space: MINT_LAYOUT.span,
           programId: TOKEN_PROGRAM_ID,
         }),
       );
       transaction.add(
         new TransactionInstruction({
           keys: [
-            {
-              pubkey: initialAccount.publicKey,
-              isSigner: false,
-              isWritable: true,
-            },
-            {pubkey: mint.publicKey, isSigner: false, isWritable: false},
-            {pubkey: owner.publicKey, isSigner: false, isWritable: false},
+            {pubkey: mint.publicKey, isSigner: false, isWritable: true},
             {pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false},
           ],
           data: encodeTokenInstructionData({
-            initializeAccount: {},
+            initializeMint: {
+              decimals,
+              mintAuthority: owner.publicKey.toBuffer(),
+              freezeAuthorityOption: false,
+              freezeAuthority: PublicKey.default.toBuffer(),
+            },
           }),
           programId: TOKEN_PROGRAM_ID,
         }),
       );
+    }
+
+
+    if (amount > 0) {
+      if (!(mintPrivateKey && initialAccountPrivateKey)) {
+        transaction.add(
+          SystemProgram.createAccount({
+            fromPubkey: owner.publicKey,
+            newAccountPubkey: initialAccount.publicKey,
+            lamports: await req.connection.getMinimumBalanceForRentExemption(
+              ACCOUNT_LAYOUT.span,
+            ),
+            space: ACCOUNT_LAYOUT.span,
+            programId: TOKEN_PROGRAM_ID,
+          }),
+        );
+        transaction.add(
+          new TransactionInstruction({
+            keys: [
+              {
+                pubkey: initialAccount.publicKey,
+                isSigner: false,
+                isWritable: true,
+              },
+              {pubkey: mint.publicKey, isSigner: false, isWritable: false},
+              {pubkey: owner.publicKey, isSigner: false, isWritable: false},
+              {pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false},
+            ],
+            data: encodeTokenInstructionData({
+              initializeAccount: {},
+            }),
+            programId: TOKEN_PROGRAM_ID,
+          }),
+        );
+      }
       transaction.add(
         new TransactionInstruction({
           keys: [
@@ -610,8 +710,8 @@ const getTokenInfo = async (req, res) => {
     const tokenList = tokenListOnEndpoint.getList();
     const tokenInfo = tokenAddress
       ? tokenList.find((token) => {
-          return token.address === tokenAddress;
-        })
+        return token.address === tokenAddress;
+      })
       : undefined;
     return cwr.createWebResp(res, 200, {
       Strategy: envStrategy[strategy?.toLowerCase()],
@@ -632,8 +732,9 @@ module.exports = {
   postDecodeMnemonic,
   postAirdropFromAddress,
   postSend,
+  postTokenSend,
   getValidatorList,
-  postPrivToPubkey,
+  postPrivateKeyToPublicKey,
   getStakeInfo,
   postStake,
   postDelegate,

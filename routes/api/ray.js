@@ -13,4 +13,10 @@ router.post(
 
 router.post('/unStake', mw.solanaNetwork, rayController.postUnStake);
 
+router.get(
+  '/stakeAccounts',
+  mw.solanaNetwork,
+  rayController.getStakeAccounts,
+);
+
 module.exports = router;
