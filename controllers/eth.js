@@ -11,6 +11,7 @@ const {StandardABI} = require('../config/ETH/StandardTokenABI');
 const cwr = require('../utils/createWebResp');
 const {SyncGetBlock} = require('../utils/eth/SyncGetBlock');
 const winston = require('../config/winston');
+const {ETHDecoder} = require('../utils/eth/ETHDecoder');
 
 const subscribe = {
   logs: undefined,
@@ -440,8 +441,9 @@ const getBlock = async (req, res) => {
 const postAddressFromPrivate = async (req, res) => {
   try {
     const {walletPrivateKey} = req.body;
-    const ethersAccount = new ethers.Wallet(walletPrivateKey);
-    return cwr.createWebResp(res, 200, {address: ethersAccount.address});
+    return cwr.createWebResp(res, 200, {
+      address: ETHDecoder.privateKeyToAddress(walletPrivateKey),
+    });
   } catch (e) {
     return cwr.errorWebResp(
       res,

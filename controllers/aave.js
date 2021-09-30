@@ -2,6 +2,7 @@ const cwr = require('../utils/createWebResp');
 const tokenABI = require('../config/ETH/AaveTokenABI');
 const StandardTokenABI = require('../config/ETH/StandardTokenABI');
 const aave = require('../config/AAVE/aave');
+const {ETHDecoder} = require('../utils/eth/ETHDecoder');
 
 const getBalance = async (req, res) => {
   try {
@@ -24,9 +25,8 @@ const getBalance = async (req, res) => {
 const postApprove = async (req, res) => {
   try {
     const {
-      myWalletAddress,
       myWalletPrivateKey,
-      amountToken,
+      // amountToken,
       gasPrice,
       gasLimit,
     } = req.body;
@@ -37,11 +37,11 @@ const postApprove = async (req, res) => {
       tokenABI.AaveABI,
       aave.addressSwitch[req.endpoint].stkaave,
     );
-    const standardContract = new req.web3.eth.Contract(
-      StandardTokenABI.StandardABI,
-      aave.addressSwitch[req.endpoint].stkaave,
-    );
-    const contractRawTx = await tokenContract.methods
+    // const standardContract = new req.web3.eth.Contract(
+    //   StandardTokenABI.StandardABI,
+    //   aave.addressSwitch[req.endpoint].stkaave,
+    // );
+    const contractRawTx = tokenContract.methods
       .approve(
         aave.addressSwitch[req.endpoint].stkaave,
         req.web3.utils.toHex(
@@ -56,7 +56,7 @@ const postApprove = async (req, res) => {
       ),
       gasLimit: req.web3.utils.toHex(gasLimit?.toString()),
       to: aave.addressSwitch[req.endpoint].aave,
-      from: myWalletAddress,
+      from: ETHDecoder.privateKeyToAddress(myWalletPrivateKey),
       data: contractRawTx,
       value: '0x0',
     };
@@ -72,13 +72,8 @@ const postApprove = async (req, res) => {
 
 const postStake = async (req, res) => {
   try {
-    const {
-      myWalletAddress,
-      myWalletPrivateKey,
-      amountToken,
-      gasPrice,
-      gasLimit,
-    } = req.body;
+    const {myWalletPrivateKey, amountToken, gasPrice, gasLimit} = req.body;
+    const myWalletAddress = ETHDecoder.privateKeyToAddress(myWalletPrivateKey);
 
     const tokenContract = new req.web3.eth.Contract(
       tokenABI.AaveABI,
@@ -95,7 +90,7 @@ const postStake = async (req, res) => {
     const totalAmount = (decimal * amountToken).toLocaleString('fullwide', {
       useGrouping: false,
     });
-    const contractRawTx = await tokenContract.methods
+    const contractRawTx = tokenContract.methods
       .stake(myWalletAddress, req.web3.utils.toHex(totalAmount))
       .encodeABI();
 
@@ -123,14 +118,8 @@ const postStake = async (req, res) => {
 
 const postClaimRewards = async (req, res) => {
   try {
-    const {
-      myWalletAddress,
-      myWalletPrivateKey,
-      amountToken,
-      gasPrice,
-      gasLimit,
-    } = req.body;
-
+    const {myWalletPrivateKey, amountToken, gasPrice, gasLimit} = req.body;
+    const myWalletAddress = ETHDecoder.privateKeyToAddress(myWalletPrivateKey);
     const tokenContract = new req.web3.eth.Contract(
       tokenABI.AaveABI,
       aave.addressSwitch[req.endpoint].stkaave,
@@ -192,14 +181,8 @@ const getAvailableStakingReward = async (req, res) => {
 
 const postRedeem = async (req, res) => {
   try {
-    const {
-      myWalletAddress,
-      myWalletPrivateKey,
-      amountToken,
-      gasPrice,
-      gasLimit,
-    } = req.body;
-
+    const {myWalletPrivateKey, amountToken, gasPrice, gasLimit} = req.body;
+    const myWalletAddress = ETHDecoder.privateKeyToAddress(myWalletPrivateKey);
     const tokenContract = new req.web3.eth.Contract(
       tokenABI.AaveABI,
       aave.addressSwitch[req.endpoint].stkaave,
@@ -243,16 +226,16 @@ const postRedeem = async (req, res) => {
 
 const postCooldown = async (req, res) => {
   try {
-    const {myWalletAddress, myWalletPrivateKey, gasPrice, gasLimit} = req.body;
-
+    const {myWalletPrivateKey, gasPrice, gasLimit} = req.body;
+    const myWalletAddress = ETHDecoder.privateKeyToAddress(myWalletPrivateKey);
     const tokenContract = new req.web3.eth.Contract(
       tokenABI.AaveABI,
       aave.addressSwitch[req.endpoint].stkaave,
     );
-    const standardContract = new req.web3.eth.Contract(
-      StandardTokenABI.StandardABI,
-      aave.addressSwitch[req.endpoint].stkaave,
-    );
+    // const standardContract = new req.web3.eth.Contract(
+    //   StandardTokenABI.StandardABI,
+    //   aave.addressSwitch[req.endpoint].stkaave,
+    // );
 
     const contractRawTx = await tokenContract.methods.cooldown().encodeABI();
 

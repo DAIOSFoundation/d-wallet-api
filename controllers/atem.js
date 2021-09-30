@@ -1,6 +1,7 @@
 const cwr = require('../utils/createWebResp');
 const tokenABI = require('../config/ETH/AtemTokenABI');
 const StandardTokenABI = require('../config/ETH/StandardTokenABI');
+const {ETHDecoder} = require('../utils/eth/ETHDecoder');
 
 const tokenAddress = '0x064C7B5f496f4B72D728AaBDDA1AF2c81B3BEAcb'; // ATEM
 
@@ -24,13 +25,8 @@ const getTimeLockList = async (req, res) => {
 
 const postBurn = async (req, res) => {
   try {
-    const {
-      myWalletAddress,
-      myWalletPrivateKey,
-      amountToken,
-      gasPrice,
-      gasLimit,
-    } = req.body;
+    const {myWalletPrivateKey, amountToken, gasPrice, gasLimit} = req.body;
+    const myWalletAddress = ETHDecoder.privateKeyToAddress(myWalletPrivateKey);
     const tokenContract = new req.web3.eth.Contract(
       tokenABI.tokenABI,
       tokenAddress,
@@ -75,15 +71,9 @@ const postBurn = async (req, res) => {
 
 const postLock = async (req, res) => {
   try {
-    const {
-      myWalletAddress,
-      myWalletPrivateKey,
-      amountToken,
-      gasPrice,
-      gasLimit,
-      lockTime,
-    } = req.body;
-
+    const {myWalletPrivateKey, amountToken, gasPrice, gasLimit, lockTime} =
+      req.body;
+    const myWalletAddress = ETHDecoder.privateKeyToAddress(myWalletPrivateKey);
     const tokenContract = new req.web3.eth.Contract(
       tokenABI.tokenABI,
       tokenAddress,
@@ -131,9 +121,8 @@ const postLock = async (req, res) => {
 
 const postUnlock = async (req, res) => {
   try {
-    const {myWalletAddress, myWalletPrivateKey, idx, gasPrice, gasLimit} =
-      req.body;
-
+    const {myWalletPrivateKey, idx, gasPrice, gasLimit} = req.body;
+    const myWalletAddress = ETHDecoder.privateKeyToAddress(myWalletPrivateKey);
     const tokenContract = new req.web3.eth.Contract(
       tokenABI.tokenABI,
       tokenAddress,

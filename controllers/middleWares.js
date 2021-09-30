@@ -14,6 +14,7 @@ const stellarConfig = require('../config/XLM/stellar');
 const eth = require('../config/ETH/eth');
 const aave = require('../config/AAVE/aave');
 const {etherscanWebUrl} = require('../config/ETH/eth');
+const {ETHDecoder} = require('../utils/eth/ETHDecoder');
 
 /// /////////////////// Middleware for XLM //////////////////////
 const isValidMnemonic = async (req, res, next) => {
@@ -101,10 +102,10 @@ const web3 = async (req, res, next) => {
       req.body.myWalletPrivateKey?.trim() ||
       req.query.myWalletPrivateKey?.trim();
     if (req.myWalletPrivateKey) {
-      const ethersAccount = new ethers.Wallet(req.myWalletPrivateKey);
-      req.myWalletAddress = ethersAccount.address;
+      req.myWalletAddress = ETHDecoder.privateKeyToAddress(
+        req.myWalletPrivateKey,
+      );
     }
-
     next();
   } catch (e) {
     return cwr.errorWebResp(res, 500, `E0000 - infuraBaseUrl`, e.message);
@@ -255,9 +256,7 @@ const solanaNetwork = async (req, res, next) => {
 const aaveNetwork = async (req, res, next) => {
   try {
     const {stake} = req.query;
-
     req.tokenAddress = aave.addressSwitch[req.endpoint][stake];
-
     next();
   } catch (e) {
     return cwr.errorWebResp(res, 500, `E0000 - aaveNetwork`, e.message);
