@@ -5,6 +5,7 @@ const {
   TransactionInstruction,
   Transaction,
   SystemProgram,
+  SYSVAR_RENT_PUBKEY,
 } = require('@solana/web3.js');
 const bip32 = require('bip32');
 const {derivePath} = require('ed25519-hd-key');
@@ -213,13 +214,13 @@ const memoInstruction = (memo) => {
   });
 };
 
-async function signAndSendTransaction(
+const signAndSendTransaction = async (
   connection,
   transaction,
   wallet,
   signers,
   skipPreflight = false,
-) {
+) => {
   transaction.recentBlockhash = (
     await connection.getRecentBlockhash('max')
   ).blockhash;
@@ -241,10 +242,10 @@ async function signAndSendTransaction(
   });
 }
 
-async function findAssociatedTokenAddressfindAssociatedTokenAddress(
+const findAssociatedTokenAddress = async (
   walletAddress,
   tokenMintAddress,
-) {
+) => {
   return (
     await PublicKey.findProgramAddress(
       [
@@ -257,11 +258,11 @@ async function findAssociatedTokenAddressfindAssociatedTokenAddress(
   )[0];
 }
 
-async function createAssociatedTokenAccountIx(
+const createAssociatedTokenAccountIx = async (
   fundingAddress,
   walletAddress,
   splTokenMintAddress,
-) {
+) => {
   const associatedTokenAddress = await findAssociatedTokenAddress(
     walletAddress,
     splTokenMintAddress,
@@ -392,6 +393,31 @@ async function createAndTransferToAccount({
   return await signAndSendTransaction(connection, transaction, owner, signers);
 }
 
+const createTransferBetweenSplTokenAccountsInstruction = ({
+                                                            ownerPublicKey,
+                                                            mint,
+                                                            decimals,
+                                                            sourcePublicKey,
+                                                            destinationPublicKey,
+                                                            amount,
+                                                            memo,
+                                                          }) => {
+  let transaction = new Transaction().add(
+    transferChecked({
+      source: sourcePublicKey,
+      mint,
+      decimals,
+      destination: destinationPublicKey,
+      owner: ownerPublicKey,
+      amount,
+    }),
+  );
+  if (memo) {
+    transaction.add(memoInstruction(memo));
+  }
+  return transaction;
+}
+
 module.exports = {
   toSOL,
   fromSOL,
@@ -410,4 +436,7 @@ module.exports = {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   transferBetweenSplTokenAccounts,
   createAndTransferToAccount,
+  assertOwner,
+  createTransferBetweenSplTokenAccountsInstruction,
+  createAssociatedTokenAccountIx,
 };

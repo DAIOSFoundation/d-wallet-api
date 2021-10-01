@@ -33,7 +33,11 @@ const {
   transferBetweenSplTokenAccounts,
   findAssociatedTokenAddress,
   createAndTransferToAccount,
+  createAssociatedTokenAccountIx,
+  assertOwner,
+  createTransferBetweenSplTokenAccountsInstruction,
 } = require('../config/SOL/solana');
+const {TokenInstructions} = require("@project-serum/serum");
 
 const getBalance = async (req, res) => {
   try {
@@ -80,7 +84,24 @@ const getTokenBalance = async (req, res) => {
       }),
     );
     let tokens = [];
+    const envEndpoint = {
+      devnet: splTokenRegistry.ENV.Devnet,
+      testnet: splTokenRegistry.ENV.Testnet,
+      'mainnet-beta': splTokenRegistry.ENV.MainnetBeta,
+    };
+    const envStrategy = {
+      github: splTokenRegistry.Strategy.GitHub,
+      solana: splTokenRegistry.Strategy.Solana,
+      static: splTokenRegistry.Strategy.Static,
+      cdn: splTokenRegistry.Strategy.CDN,
+    };
+    const allTokenList = await new splTokenRegistry.TokenListProvider().resolve();
+    const tokenListOnEndpoint = allTokenList.filterByChainId(
+      envEndpoint[req.network],
+    );
+    const tokenList = tokenListOnEndpoint.getList();
     for (const i in result) {
+      const tokenInfo = tokenList.find((token) => {return token.address === result[i].accountInfo.data.parsed.info.mint;});
       const token = {
         publicKey: result[i].publicKey.toString(),
         mint: result[i].accountInfo.data.parsed.info.mint,
@@ -88,6 +109,8 @@ const getTokenBalance = async (req, res) => {
         amount: result[i].accountInfo.data.parsed.info.tokenAmount.uiAmount,
         decimals: result[i].accountInfo.data.parsed.info.tokenAmount.decimals,
         program: result[i].accountInfo.data.program,
+        tokenName: tokenInfo?.name,
+        tokenSymbol: tokenInfo?.symbol,
       };
       tokens.push(token);
     }
@@ -113,8 +136,23 @@ const getBlock = async (req, res) => {
 
 const getTransaction = async (req, res) => {
   try {
-    const {txNumber} = req.query;
-    const tx = await req.connection.getTransaction(txNumber);
+    const {txNumber, address} = req.query;
+    let tx
+    if(txNumber)
+    {
+      tx = await req.connection.getTransaction(txNumber);
+    }
+    else if(address)
+    {
+      const networks = {
+        "mainnet-beta": "api",
+        "devnet": "api-devnet",
+        "testnet": "api-testnet",
+      }
+      const url = "https://" + networks[req.network] + ".solscan.io/account/transaction?address=" + address;
+      const response = await axios.get(url);
+      tx = response.data;
+    }
     return cwr.createWebResp(res, 200, {txNumber, tx});
   } catch (e) {
     return cwr.errorWebResp(res, 500, 'E0000 - getTransaction', e.message);
@@ -248,75 +286,89 @@ const postSend = async (req, res) => {
 const postTokenSend = async (req, res) => {
   try {
     const {
-      owner,
+      //owner,
+      fromPrivateKey,
+      fromMnemonic,
       sourcePublicKey,
-      destinationPublicKey,
+      toAddress,
       amount,
       memo,
-      mint,
+      mintAddress,
       decimals,
       overrideDestinationCheck,
     } = req.body;
-    const {connection} = req;
 
-    let destinationAccountInfo = await connection.getAccountInfo(
-      destinationPublicKey,
-    );
-    if (
-      !!destinationAccountInfo &&
-      destinationAccountInfo.owner.equals(TOKEN_PROGRAM_ID)
-    ) {
-      return await transferBetweenSplTokenAccounts({
-        connection,
-        owner,
-        mint,
-        decimals,
-        sourcePublicKey,
-        destinationPublicKey,
-        amount,
-        memo,
-      });
+    let from;
+    if (fromMnemonic) {
+      const seed = bip39.mnemonicToSeedSync(fromMnemonic);
+      from = Keypair.fromSeed(seed.slice(0, 32));
+    } else if (fromPrivateKey) {
+      const privKey = Uint8Array.from(fromPrivateKey.split(','));
+      from = Keypair.fromSecretKey(privKey);
+    } else {
+      return cwr.errorWebResp(
+        res,
+        500,
+        `E0000 - postSendSol`,
+        'input one of fromMnemonic or fromPrivateKey',
+      );
     }
+    const to = new PublicKey(toAddress);
+    const mint = new PublicKey(mintAddress);
 
-    if (
-      (!destinationAccountInfo || destinationAccountInfo.lamports === 0) &&
-      !overrideDestinationCheck
-    ) {
-      throw new Error('Cannot send to address with zero SOL balances');
-    }
+    let destinationAccountInfo = await req.connection.getAccountInfo(
+      to,
+    );
+    const transaction = new Transaction();
 
-    const destinationAssociatedTokenAddress = await findAssociatedTokenAddress(
-      destinationPublicKey,
-      mint,
-    );
-    destinationAccountInfo = await req.connection.getAccountInfo(
-      destinationAssociatedTokenAddress,
-    );
-    if (
-      !!destinationAccountInfo &&
-      destinationAccountInfo.owner.equals(TOKEN_PROGRAM_ID)
-    ) {
-      return await transferBetweenSplTokenAccounts({
-        connection,
-        owner,
-        mint,
-        decimals,
-        sourcePublicKey,
-        destinationPublicKey: destinationAssociatedTokenAddress,
-        amount,
-        memo,
-      });
+    if (!!destinationAccountInfo && destinationAccountInfo.owner.equals(TOKEN_PROGRAM_ID)) {
+
     }
-    return await createAndTransferToAccount({
-      connection,
-      owner,
-      sourcePublicKey,
-      destinationPublicKey,
-      amount,
-      memo,
-      mint,
-      decimals,
-    });
+    else {
+      const destinationAssociatedTokenAddress = (await PublicKey.findProgramAddress(
+        [
+          to.toBuffer(),
+          TokenInstructions.TOKEN_PROGRAM_ID.toBuffer(),
+          mint.toBuffer(),
+        ],
+        ASSOCIATED_TOKEN_PROGRAM_ID,
+      ))[0];
+      /*destinationAccountInfo = await req.connection.getAccountInfo(
+        destinationAssociatedTokenAddress,
+      );*/
+      if ((!destinationAccountInfo || destinationAccountInfo.lamports === 0)) {
+        throw new Error('Cannot send to address with zero SOL balances');
+      }
+      else if (!!destinationAccountInfo && destinationAccountInfo.owner.equals(TOKEN_PROGRAM_ID)) {
+
+      }
+      else {
+        const [createAccountInstruction, newAddress] =
+          await createAssociatedTokenAccountIx(
+            from.publicKey,
+            to,
+            mint,
+          );
+        transaction.add(
+          assertOwner({
+            account: to,
+            owner: SystemProgram.programId,
+          }),
+        );
+        transaction.add(createAccountInstruction);
+        const transferBetweenAccountsTxn =
+          createTransferBetweenSplTokenAccountsInstruction({
+            ownerPublicKey: from.publicKey,
+            mint,
+            decimals,
+            sourcePublicKey,
+            destinationPublicKey: newAddress,
+            amount,
+            memo,
+          });
+        transaction.add(transferBetweenAccountsTxn);
+      }
+    }
 
     return cwr.createWebResp(res, 200, {});
   } catch (e) {
@@ -716,11 +768,9 @@ const getTokenInfo = async (req, res) => {
       envEndpoint[req.network],
     );
     const tokenList = tokenListOnEndpoint.getList();
-    const tokenInfo = tokenAddress
-      ? tokenList.find((token) => {
-          return token.address === tokenAddress;
-        })
-      : undefined;
+    const tokenInfo = tokenList.find((token) => {
+        return token.address === tokenAddress;
+      });
     return cwr.createWebResp(res, 200, {
       Strategy: envStrategy[strategy?.toLowerCase()],
       tokenInfo,
