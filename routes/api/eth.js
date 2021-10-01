@@ -44,13 +44,6 @@ router.get(
   ethController.getTokenTxWithAddress,
 );
 
-router.get(
-  '/tokenTxDetailWithAddress',
-  mw.etherscan,
-  mw.web3,
-  ethController.getTokenTxDetailWithAddress,
-);
-
 router.get('/tx', mw.web3, ethController.getTx);
 
 router.get('/block', mw.web3, ethController.getBlock);

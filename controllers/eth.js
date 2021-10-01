@@ -418,37 +418,6 @@ const getTokenTxWithAddress = async (req, res) => {
   }
 };
 
-const getTokenTxDetailWithAddress = async (req, res) => {
-  /*
-   * Transaction list with transaction details.
-   * Represent with Functions.
-   * */
-  try {
-    const {walletAddress, tokenAddress, startBlock, endBlock, sort} = req.query;
-    const tokenTxList = await req.etherscan.account.tokentx(
-      walletAddress,
-      tokenAddress,
-      startBlock,
-      endBlock,
-      null,
-      null,
-      sort,
-    );
-
-    const promises = [];
-
-    // tokenTxList
-    return cwr.createWebResp(res, 200, tokenTxList.result);
-  } catch (e) {
-    return cwr.errorWebResp(
-      res,
-      500,
-      'E0000 - getTokenTxDetailWithAddress',
-      e.message || e,
-    );
-  }
-};
-
 const getTx = async (req, res) => {
   try {
     const {txHash} = req.query;
@@ -606,7 +575,6 @@ module.exports = {
   getGasPriceFromNet,
   getTxWithAddress,
   getTokenTxWithAddress,
-  getTokenTxDetailWithAddress,
   getTx,
   getBlock,
   postAddressFromPrivate,
