@@ -43,10 +43,10 @@ const PATH = {
 };
 
 const walletProvidor = {
-  deprecated: "SOLFLARE, Sollet.io",
-  bip44: "Trust Wallet, SOLFLARE, Sollet.io",
-  bip44Change: "SOLFLARE, Phantom Wallet, Sollet.io",
-  cliWallet: "cliWallet",
+  deprecated: 'SOLFLARE, Sollet.io',
+  bip44: 'Trust Wallet, SOLFLARE, Sollet.io',
+  bip44Change: 'SOLFLARE, Phantom Wallet, Sollet.io',
+  cliWallet: 'cliWallet',
 };
 
 function deriveSeed(seed, walletIndex, derivationPath, accountIndex) {
@@ -238,12 +238,9 @@ const signAndSendTransaction = async (
     skipPreflight,
     preflightCommitment: 'single',
   });
-}
+};
 
-const findAssociatedTokenAddress = async (
-  walletAddress,
-  tokenMintAddress,
-) => {
+const findAssociatedTokenAddress = async (walletAddress, tokenMintAddress) => {
   return (
     await PublicKey.findProgramAddress(
       [
@@ -254,7 +251,7 @@ const findAssociatedTokenAddress = async (
       ASSOCIATED_TOKEN_PROGRAM_ID,
     )
   )[0];
-}
+};
 
 const createAssociatedTokenAccountIx = async (
   fundingAddress,
@@ -309,7 +306,7 @@ const createAssociatedTokenAccountIx = async (
     data: Buffer.from([]),
   });
   return [ix, associatedTokenAddress];
-}
+};
 
 const OWNER_VALIDATION_PROGRAM_ID = new PublicKey(
   '4MNPdKu9wFMvEeZBMt3Eipfs5ovVWTJb31pEXDJAAxX5',
@@ -392,15 +389,15 @@ async function createAndTransferToAccount({
 }
 
 const createTransferBetweenSplTokenAccountsInstruction = ({
-                                                            ownerPublicKey,
-                                                            mint,
-                                                            decimals,
-                                                            sourcePublicKey,
-                                                            destinationPublicKey,
-                                                            amount,
-                                                            memo,
-                                                          }) => {
-  let transaction = new Transaction().add(
+  ownerPublicKey,
+  mint,
+  decimals,
+  sourcePublicKey,
+  destinationPublicKey,
+  amount,
+  memo,
+}) => {
+  const transaction = new Transaction().add(
     transferChecked({
       source: sourcePublicKey,
       mint,
@@ -414,7 +411,7 @@ const createTransferBetweenSplTokenAccountsInstruction = ({
     transaction.add(memoInstruction(memo));
   }
   return transaction;
-}
+};
 
 module.exports = {
   toSOL,
