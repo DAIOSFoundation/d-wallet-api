@@ -24,7 +24,6 @@ const DERIVATION_PATH = {
   bip44: 'bip44',
   bip44Change: 'bip44Change',
   cliWallet: 'cliWallet',
-  Phantom: 'Phantom',
   // bip44Root: 'bip44Root', // Ledger only.
 };
 const PATH = {
@@ -40,10 +39,14 @@ const PATH = {
   cliWallet: (walletIndex, accountIndex) => {
     return 'undefined';
   },
-  Phantom: (walletIndex, accountIndex) => {
-    return `m/44'/501'/0'/${accountIndex}`;
-  },
   // bip44Root: 'bip44Root', // Ledger only.
+};
+
+const walletProvidor = {
+  deprecated: "SOLFLARE, Sollet.io",
+  bip44: "Trust Wallet, SOLFLARE, Sollet.io",
+  bip44Change: "SOLFLARE, Phantom Wallet, Sollet.io",
+  cliWallet: "cliWallet",
 };
 
 function deriveSeed(seed, walletIndex, derivationPath, accountIndex) {
@@ -62,11 +65,6 @@ function deriveSeed(seed, walletIndex, derivationPath, accountIndex) {
     }
     case DERIVATION_PATH.cliWallet: {
       return seed.slice(0, 32);
-    }
-    case DERIVATION_PATH.Phantom: {
-      const pathPhantom = `m/44'/501'/0'/${accountIndex}`;
-      // const hexSeed = Buffer.from(seed).toString('hex');
-      return bip32.fromSeed(seed).derivePath(pathPhantom).privateKey;
     }
     default:
       throw new Error(`invalid derivation path: ${derivationPath}`);
@@ -439,4 +437,5 @@ module.exports = {
   assertOwner,
   createTransferBetweenSplTokenAccountsInstruction,
   createAssociatedTokenAccountIx,
+  walletProvidor,
 };

@@ -36,6 +36,7 @@ const {
   createAssociatedTokenAccountIx,
   assertOwner,
   createTransferBetweenSplTokenAccountsInstruction,
+  walletProvidor,
 } = require('../config/SOL/solana');
 const {TokenInstructions} = require("@project-serum/serum");
 
@@ -219,8 +220,8 @@ const postDecodeMnemonic = async (req, res) => {
         path: PATH[item](walletIndex, accountIndex),
         publicKey: account.publicKey.toString(),
         privateKey: account.secretKey.toString('hex'),
-        // keypairPublicKey: keypair.publicKey.toString(),
         keypairSecretKey: keypair.secretKey.toString(),
+        walletProvidor: walletProvidor[item],
       };
     }
     return cwr.createWebResp(res, 200, wallet);
@@ -295,7 +296,6 @@ const postTokenSend = async (req, res) => {
       memo,
       mintAddress,
       decimals,
-      overrideDestinationCheck,
     } = req.body;
 
     let from;
