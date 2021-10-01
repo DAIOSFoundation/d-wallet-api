@@ -19,16 +19,11 @@ const postApprove = async (req, res) => {
       tokenABI.AaveABI,
       aave.addressSwitch[req.endpoint].stkaave,
     );
-    const standardContract = new req.web3.eth.Contract(
-      StandardTokenABI.StandardABI,
-      aave.addressSwitch[req.endpoint].stkaave,
-    );
-    const UINT_MAX = type(int).max;
     const contractRawTx = await tokenContract.methods
       .approve(
         aave.addressSwitch[req.endpoint].stkaave,
         req.web3.utils.toHex(
-          MAX_INT.toString(),
+          MAX_INT,
         ),
       )
       .encodeABI();
@@ -76,7 +71,7 @@ const postStake = async (req, res) => {
     const totalAmount = (decimal * amountToken).toLocaleString('fullwide', {
       useGrouping: false,
     });
-    const contractRawTx = await tokenContract.methods
+    const contractRawTx = tokenContract.methods
       .stake(myWalletAddress, req.web3.utils.toHex(totalAmount))
       .encodeABI();
     const rawTx = {
@@ -233,10 +228,6 @@ const postCooldown = async (req, res) => {
     const myWalletAddress = (new ethers.Wallet(myWalletPrivateKey)).address;
     const tokenContract = new req.web3.eth.Contract(
       tokenABI.AaveABI,
-      aave.addressSwitch[req.endpoint].stkaave,
-    );
-    const standardContract = new req.web3.eth.Contract(
-      StandardTokenABI.StandardABI,
       aave.addressSwitch[req.endpoint].stkaave,
     );
     const contractRawTx = await tokenContract.methods.cooldown().encodeABI();

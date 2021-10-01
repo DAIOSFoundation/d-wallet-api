@@ -1,6 +1,7 @@
 const cwr = require('../utils/createWebResp');
 const OrbsTokenABI = require('../config/ETH/OrbsTokenABI');
 const StandardTokenABI = require('../config/ETH/StandardTokenABI');
+const {ETHDecoder} = require('../utils/eth/ETHDecoder');
 
 const getGuardians = async (req, res) => {
   try {
@@ -44,14 +45,8 @@ const getUnstakeStatus = async (req, res) => {
 
 const postApprove = async (req, res) => {
   try {
-    const {
-      myWalletAddress,
-      myWalletPrivateKey,
-      amountToken,
-      gasPrice,
-      gasLimit,
-    } = req.body;
-
+    const {myWalletPrivateKey, amountToken, gasPrice, gasLimit} = req.body;
+    const myWalletAddress = ETHDecoder.privateKeyToAddress(myWalletPrivateKey);
     const account =
       req.web3.eth.accounts.privateKeyToAccount(myWalletPrivateKey);
     const tokenContract = new req.web3.eth.Contract(
@@ -91,14 +86,8 @@ const postApprove = async (req, res) => {
 
 const postStake = async (req, res) => {
   try {
-    const {
-      myWalletAddress,
-      myWalletPrivateKey,
-      amountToken,
-      gasPrice,
-      gasLimit,
-    } = req.body;
-
+    const {myWalletPrivateKey, amountToken, gasPrice, gasLimit} = req.body;
+    const myWalletAddress = ETHDecoder.privateKeyToAddress(myWalletPrivateKey);
     const account =
       req.web3.eth.accounts.privateKeyToAccount(myWalletPrivateKey);
     const tokenContract = new req.web3.eth.Contract(
@@ -142,14 +131,8 @@ const postStake = async (req, res) => {
 
 const postUnstake = async (req, res) => {
   try {
-    const {
-      myWalletAddress,
-      myWalletPrivateKey,
-      amountToken,
-      gasPrice,
-      gasLimit,
-    } = req.body;
-
+    const {myWalletPrivateKey, amountToken, gasPrice, gasLimit} = req.body;
+    const myWalletAddress = ETHDecoder.privateKeyToAddress(myWalletPrivateKey);
     const account =
       req.web3.eth.accounts.privateKeyToAccount(myWalletPrivateKey);
     const tokenContract = new req.web3.eth.Contract(
@@ -193,9 +176,8 @@ const postUnstake = async (req, res) => {
 
 const postDelegate = async (req, res) => {
   try {
-    const {myWalletAddress, myWalletPrivateKey, guardian, gasPrice, gasLimit} =
-      req.body;
-
+    const {myWalletPrivateKey, guardian, gasPrice, gasLimit} = req.body;
+    const myWalletAddress = ETHDecoder.privateKeyToAddress(myWalletPrivateKey);
     const account =
       req.web3.eth.accounts.privateKeyToAccount(myWalletPrivateKey);
     const tokenContract = new req.web3.eth.Contract(
@@ -227,8 +209,8 @@ const postDelegate = async (req, res) => {
 
 const postClaimRewards = async (req, res) => {
   try {
-    const {myWalletAddress, myWalletPrivateKey, gasPrice, gasLimit} = req.body;
-
+    const {myWalletPrivateKey, gasPrice, gasLimit} = req.body;
+    const myWalletAddress = ETHDecoder.privateKeyToAddress(myWalletPrivateKey);
     const account =
       req.web3.eth.accounts.privateKeyToAccount(myWalletPrivateKey);
     const tokenContract = new req.web3.eth.Contract(

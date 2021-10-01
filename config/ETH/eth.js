@@ -35,7 +35,7 @@ const ethereumChainIDs = {
   kovan: 42,
   BSC: 56, // Binance Smart Chain (rpc url: https://bsc-dataseed.binance.org)
 };
-const MAX_INT = 115792089237316195423570985008687907853269984665640564039457584007913129639935;
+const MAX_INT = '115792089237316195423570985008687907853269984665640564039457584007913129639935';
 
 module.exports = {
   switchBaseUrl,
