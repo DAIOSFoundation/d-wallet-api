@@ -55,6 +55,13 @@ router.post(
   solController.postDeactivate,
 );
 
+router.post(
+  '/createTokenAccount',
+  mw.checkMnemonic,
+  mw.solanaNetwork,
+  solController.postCreateTokenAccount,
+);
+
 router.post('/privateKeyToPublicKey', solController.postPrivateKeyToPublicKey);
 
 router.post(

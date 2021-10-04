@@ -1,19 +1,14 @@
 const {
   Account,
-  Keypair,
   PublicKey,
-  Transaction,
   TransactionInstruction,
   SystemProgram,
-  Connection,
   SYSVAR_CLOCK_PUBKEY,
 } = require('@solana/web3.js');
-const bip32 = require('bip32');
-const {derivePath} = require('ed25519-hd-key');
 const BufferLayout = require('buffer-layout');
 const {Token} = require('@solana/spl-token');
 const {struct, u8, nu64} = require('buffer-layout');
-const {publicKey, u128, u64} = require('@project-serum/borsh');
+const {publicKey, u64, u128} = require('@project-serum/borsh');
 const BigNumber = require('bignumber.js');
 
 function lt(a, b) {
@@ -68,6 +63,7 @@ const toSOL = (value, decimals) => {
 const fromSOL = (value, decimals) => {
   return value * 10 ** (decimals || 9);
 };
+
 const TOKEN_PROGRAM_ID = new PublicKey(
   'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
 );
@@ -87,6 +83,21 @@ const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey(
 const MEMO_PROGRAM_ID = new PublicKey(
   'Memo1UhkJRfHyvLMcVucJwxXeuD728EqVDDwQDxFMNo',
 );
+
+const STAKE_INFO_LAYOUT = struct([
+  u64('state'),
+  u64('nonce'),
+  publicKey('poolLpTokenAccount'),
+  publicKey('poolRewardTokenAccount'),
+  publicKey('owner'),
+  publicKey('feeOwner'),
+  u64('feeY'),
+  u64('feeX'),
+  u64('totalReward'),
+  u128('rewardPerShareNet'),
+  u64('lastBlock'),
+  u64('rewardPerBlock'),
+]);
 
 const NATIVE_SOL = {
   symbol: 'SOL',
@@ -2544,16 +2555,59 @@ const withdrawInstruction = (
   });
 };
 
+const getMultipleAccounts = async (connection, publicKeys, commitment) => {
+  const keys = [];
+  let tempKeys = [];
+
+  publicKeys.forEach((k) => {
+    if (tempKeys.length >= 100) {
+      keys.push(tempKeys);
+      tempKeys = [];
+    }
+    tempKeys.push(k);
+  });
+  if (tempKeys.length > 0) {
+    keys.push(tempKeys);
+  }
+
+  const accounts = [];
+
+  const resArray = {};
+  await Promise.all(
+    keys.map(async (key, index) => {
+      const res = await connection.getMultipleAccountsInfo(key, commitment);
+      resArray[index] = res;
+    }),
+  );
+
+  Object.keys(resArray)
+    .sort((a, b) => parseInt(a, 10) - parseInt(b, 10))
+    .forEach((itemIndex) => {
+      const res = resArray[parseInt(itemIndex, 10)];
+      for (const account of res) {
+        accounts.push(account);
+      }
+    });
+
+  return accounts.map((account, idx) => {
+    if (account === null) {
+      return null;
+    }
+    return {
+      publicKey,
+      account,
+    };
+  });
+};
+
 const getInfoAccount = async (accountAddress, connection) => {
-  const accountAddressPublicKey = new PublicKey(accountAddress);
-  const publickey = new PublicKey(STAKE_PROGRAM_ID);
   const filter = {
     commitment: connection.commitment,
     filters: [
       {
         memcmp: {
           offset: 40,
-          bytes: accountAddressPublicKey.toBase58(),
+          bytes: new PublicKey(accountAddress).toBase58(),
         },
       },
       {
@@ -2562,47 +2616,68 @@ const getInfoAccount = async (accountAddress, connection) => {
     ],
     encoding: 'base64',
   };
-  let getProgramAccounts = await connection.getProgramAccounts(
-    publickey,
+  const getProgramAccounts = await connection.getProgramAccounts(
+    new PublicKey(STAKE_PROGRAM_ID),
     filter,
   );
-  getProgramAccounts = getProgramAccounts.map(({account, pubkey}) => ({
-    poolId: USER_STAKE_INFO_ACCOUNT_LAYOUT.decode(
-      account.data,
-    ).poolId.toString(),
-    name: FARMS.find((item) => {
-      return (
-        item.poolId ===
-        USER_STAKE_INFO_ACCOUNT_LAYOUT.decode(account.data).poolId.toString()
-      );
-    }).name,
-    depositBalance: new TokenAmount(
-      getBigNumber(
-        USER_STAKE_INFO_ACCOUNT_LAYOUT.decode(account.data).depositBalance,
-      ),
-      FARMS.find((item) => {
-        return (
-          item.poolId ===
-          USER_STAKE_INFO_ACCOUNT_LAYOUT.decode(account.data).poolId.toString()
-        );
-      }).lp.decimals,
-    ).toEther(),
-    rewardDebt: new TokenAmount(
-      getBigNumber(
-        USER_STAKE_INFO_ACCOUNT_LAYOUT.decode(account.data).rewardDebt,
-      ),
-      FARMS.find((item) => {
-        return (
-          item.poolId ===
-          USER_STAKE_INFO_ACCOUNT_LAYOUT.decode(account.data).poolId.toString()
-        );
-      }).reward.decimals,
-    ).toEther(),
-    publicKey: pubkey.toString(),
-  }));
-  getProgramAccounts = getProgramAccounts.sort((a, b) => {
-    return b.name - a.name;
-  }); // b-a: 오름차순, a-b: 내림차순
+
+  const poolIdPublicKeys = [];
+  getProgramAccounts.forEach((item) => {
+    item.account.data = USER_STAKE_INFO_ACCOUNT_LAYOUT.decode(
+      item.account.data,
+    );
+    poolIdPublicKeys.push(item.account.data.poolId);
+  });
+
+  const multipleInfo = await getMultipleAccounts(
+    connection,
+    poolIdPublicKeys,
+    connection.commitment,
+  );
+  multipleInfo.forEach((info) => {
+    info.account.data = STAKE_INFO_LAYOUT.decode(
+      Buffer.from(info.account.data),
+    );
+  });
+
+  getProgramAccounts.forEach((item) => {
+    item.publicKey = item.pubkey.toString();
+    item.decimals = FARMS.find((farm) => {
+      return farm.poolId === item.account.data.poolId.toString();
+    }).reward.decimals;
+    item.name = FARMS.find((farm) => {
+      return farm.poolId === item.account.data.poolId.toString();
+    }).name;
+    item.poolLpTokenAccount = FARMS.find((farm) => {
+      return farm.poolId === item.account.data.poolId.toString();
+    }).poolLpTokenAccount;
+    item.farmInfo = multipleInfo.find(
+      ({account}) =>
+        account.data.poolLpTokenAccount.toString() === item.poolLpTokenAccount,
+    );
+    item.account.data.depositBalance = new TokenAmount(
+      getBigNumber(item.account.data.depositBalance),
+      item.decimals,
+    );
+    item.account.data.rewardDebt = new TokenAmount(
+      item.account.data.rewardDebt,
+      item.decimals,
+    );
+    item.rewardDebt = new TokenAmount(
+      item.account.data.depositBalance.wei
+        .multipliedBy(
+          getBigNumber(item.farmInfo.account.data.rewardPerShareNet),
+        )
+        .dividedBy(1e9)
+        .minus(item.account.data.rewardDebt.wei),
+      item.decimals,
+    ).toEther();
+    item.depositBalance = item.account.data.depositBalance.toEther();
+    item.pubkey = undefined;
+    item.account = undefined;
+    item.farmInfo = undefined;
+    item.poolLpTokenAccount = undefined;
+  });
   return getProgramAccounts;
 };
 

@@ -12,11 +12,6 @@ const {
   createProgramAccountIfNotExist,
   withdrawInstruction,
   FARMS,
-  lt,
-  TokenAmount,
-  STAKE_PROGRAM_ID,
-  STAKE_PROGRAM_ID_V4,
-  STAKE_PROGRAM_ID_V5,
   getInfoAccount,
 } = require('../config/SOL/raydium');
 

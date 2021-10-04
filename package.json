@@ -47,10 +47,10 @@
     "web3": "^1.5.3",
     "winston": "^3.3.3",
     "winston-daily-rotate-file": "^4.5.5",
-    "xdr-parser": "^1.0.8"
+    "xdr-parser": "^1.0.8",
+    "bignumber.js": "^9.0.1"
   },
   "devDependencies": {
-    "bignumber.js": "^9.0.1",
     "eslint": "^7.32.0",
     "eslint-config-airbnb-base": "^14.2.1",
     "eslint-config-prettier": "^8.3.0",
