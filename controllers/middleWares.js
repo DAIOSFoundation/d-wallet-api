@@ -241,7 +241,12 @@ const solanaNetwork = async (req, res, next) => {
   try {
     req.network = req.body.network || req.query.network;
     if (!req.network) {
-      throw 'req.network is not supported!!';
+      return cwr.errorWebResp(
+        res,
+        500,
+        `E0000 - solanaNetwork`,
+        'network is not supported!!',
+      );
     }
     req.web3 = solanaWeb3;
     req.endpoint = req.web3.clusterApiUrl(req.network);
