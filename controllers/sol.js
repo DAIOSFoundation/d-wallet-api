@@ -123,28 +123,47 @@ const getBlock = async (req, res) => {
 
 const getTransaction = async (req, res) => {
   try {
-    const {txNumber, address} = req.query;
-    let tx;
-    if (txNumber) {
-      tx = await req.connection.getTransaction(txNumber);
-    } else if (address) {
-      const networks = {
-        'mainnet-beta': 'api',
-        devnet: 'api-devnet',
-        testnet: 'api-testnet',
-      };
-      const url = `https://${
-        networks[req.network]
-      }.solscan.io/account/transaction?address=${address}`;
-      const response = await axios.get(url);
-      tx = response?.data?.data;
-      for (const item of tx) {
-        item.txDetail = await req.connection.getTransaction(item?.txHash);
-      }
-    }
+    const {txNumber} = req.query;
+    const tx = await req.connection.getTransaction(txNumber);
     return cwr.createWebResp(res, 200, {txNumber, tx});
   } catch (e) {
     return cwr.errorWebResp(res, 500, 'E0000 - getTransaction', e.message);
+  }
+};
+
+const getAccountDetail = async (req, res) => {
+  try {
+    const {address} = req.query;
+    const networks = {
+      'mainnet-beta': 'api',
+      devnet: 'api-devnet',
+      testnet: 'api-testnet',
+    };
+    const url = `https://${
+      networks[req.network]
+    }.solscan.io/account/transaction?address=${address}`;
+    const response = await axios.get(url);
+    const transactions = response?.data?.data;
+    const txHashes = [];
+    // eslint-disable-next-line no-restricted-syntax
+    for (const transaction of transactions) {
+      txHashes.push(transaction.txHash);
+    }
+    const promises = [];
+    let results;
+    if (transactions && txHashes) {
+      txHashes.map((txHash) =>
+        promises.push(req.connection.getTransaction(txHash)),
+      );
+      results = await Promise.all(promises);
+      for (let i = 0; i < transactions.length; i += 1) {
+        transactions[i].txDetail = results[i];
+      }
+      return cwr.createWebResp(res, 200, {transactions});
+    }
+    return cwr.errorWebResp(res, 500, 'E0000 - getAccountDetail');
+  } catch (e) {
+    return cwr.errorWebResp(res, 500, 'E0000 - getAccountDetail', e.message);
   }
 };
 
@@ -854,6 +873,7 @@ module.exports = {
   getBlock,
   getTransaction,
   postDecodeMnemonic,
+  getAccountDetail,
   postAirdropFromAddress,
   postSend,
   postTokenSend,
