@@ -42,7 +42,7 @@ const PATH = {
   // bip44Root: 'bip44Root', // Ledger only.
 };
 
-const walletProvidor = {
+const walletProvider = {
   deprecated: 'SOLFLARE, Sollet.io',
   bip44: 'Trust Wallet, SOLFLARE, Sollet.io',
   bip44Change: 'SOLFLARE, Phantom Wallet, Sollet.io',
@@ -149,29 +149,6 @@ function encodeTokenInstructionData(instruction) {
   const span = LAYOUT.encode(instruction, b);
   return b.slice(0, span);
 }
-
-const transferBetweenSplTokenAccounts = async ({
-  connection,
-  owner,
-  mint,
-  decimals,
-  sourcePublicKey,
-  destinationPublicKey,
-  amount,
-  memo,
-}) => {
-  const transaction = createTransferBetweenSplTokenAccountsInstruction({
-    ownerPublicKey: owner.publicKey,
-    mint,
-    decimals,
-    sourcePublicKey,
-    destinationPublicKey,
-    amount,
-    memo,
-  });
-  const signers = [];
-  return await signAndSendTransaction(connection, transaction, owner, signers);
-};
 
 const transferChecked = ({
   source,
@@ -349,45 +326,6 @@ function assertOwner({account, owner}) {
   });
 }
 
-async function createAndTransferToAccount({
-  connection,
-  owner,
-  sourcePublicKey,
-  destinationPublicKey,
-  amount,
-  memo,
-  mint,
-  decimals,
-}) {
-  const [createAccountInstruction, newAddress] =
-    await createAssociatedTokenAccountIx(
-      owner.publicKey,
-      destinationPublicKey,
-      mint,
-    );
-  const transaction = new Transaction();
-  transaction.add(
-    assertOwner({
-      account: destinationPublicKey,
-      owner: SystemProgram.programId,
-    }),
-  );
-  transaction.add(createAccountInstruction);
-  const transferBetweenAccountsTxn =
-    createTransferBetweenSplTokenAccountsInstruction({
-      ownerPublicKey: owner.publicKey,
-      mint,
-      decimals,
-      sourcePublicKey,
-      destinationPublicKey: newAddress,
-      amount,
-      memo,
-    });
-  transaction.add(transferBetweenAccountsTxn);
-  const signers = [];
-  return await signAndSendTransaction(connection, transaction, owner, signers);
-}
-
 const createTransferBetweenSplTokenAccountsInstruction = ({
   ownerPublicKey,
   mint,
@@ -413,6 +351,44 @@ const createTransferBetweenSplTokenAccountsInstruction = ({
   return transaction;
 };
 
+const createAndTransferToAccount = async (
+  // connection,
+  owner,
+  sourcePublicKey,
+  destinationPublicKey,
+  amount,
+  memo,
+  mint,
+  decimals,
+) => {
+  const [createAccountInstruction, newAddress] =
+    await createAssociatedTokenAccountIx(
+      owner.publicKey,
+      destinationPublicKey,
+      mint,
+    );
+  const transaction = new Transaction();
+  transaction.add(
+    assertOwner({
+      account: destinationPublicKey,
+      owner: SystemProgram.programId,
+    }),
+  );
+  transaction.add(createAccountInstruction);
+  const transferBetweenAccountsTxn =
+    createTransferBetweenSplTokenAccountsInstruction({
+      ownerPublicKey: owner.publicKey,
+      mint,
+      decimals,
+      sourcePublicKey,
+      destinationPublicKey: newAddress,
+      amount,
+      memo,
+    });
+  transaction.add(transferBetweenAccountsTxn);
+  return transaction;
+};
+
 module.exports = {
   toSOL,
   fromSOL,
@@ -429,10 +405,8 @@ module.exports = {
   transferChecked,
   memoInstruction,
   ASSOCIATED_TOKEN_PROGRAM_ID,
-  transferBetweenSplTokenAccounts,
   createAndTransferToAccount,
   assertOwner,
-  createTransferBetweenSplTokenAccountsInstruction,
   createAssociatedTokenAccountIx,
-  walletProvidor,
+  walletProvider,
 };

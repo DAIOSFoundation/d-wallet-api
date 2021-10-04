@@ -15,6 +15,12 @@ const {
 } = require('@solana/web3.js');
 const bip39 = require('bip39');
 const splTokenRegistry = require('@solana/spl-token-registry');
+const {
+  Token,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  TOKEN_PROGRAM_ID,
+  u64,
+} = require('@solana/spl-token');
 const {TokenInstructions} = require('@project-serum/serum');
 const cwr = require('../utils/createWebResp');
 const {
@@ -24,36 +30,19 @@ const {
   PATH,
   getAccountFromSeed,
   getKeypairFromSeed,
-  TOKEN_PROGRAM_ID,
   MINT_LAYOUT,
   ACCOUNT_LAYOUT,
   encodeTokenInstructionData,
   transferChecked,
   memoInstruction,
-  ASSOCIATED_TOKEN_PROGRAM_ID,
-  transferBetweenSplTokenAccounts,
-  findAssociatedTokenAddress,
   createAndTransferToAccount,
   createAssociatedTokenAccountIx,
-  assertOwner,
-  createTransferBetweenSplTokenAccountsInstruction,
-  walletProvidor,
+  walletProvider,
 } = require('../config/SOL/solana');
 
 const getBalance = async (req, res) => {
   try {
     const {address} = req.query;
-    /*
-    // http-rpc prototype
-    const url = req.endpoint;
-    const result = await axios.post(url, {
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'getBalance',
-      params: [address],
-    });
-    const balance = toSOL(result?.data?.result?.value);
-    */
     const publicKey = new PublicKey(address);
     const balance = toSOL(await req.connection.getBalance(publicKey));
     return cwr.createWebResp(res, 200, {balance, UNIT: 'SOL'});
@@ -90,12 +79,6 @@ const getTokenBalance = async (req, res) => {
       testnet: splTokenRegistry.ENV.Testnet,
       'mainnet-beta': splTokenRegistry.ENV.MainnetBeta,
     };
-    const envStrategy = {
-      github: splTokenRegistry.Strategy.GitHub,
-      solana: splTokenRegistry.Strategy.Solana,
-      static: splTokenRegistry.Strategy.Static,
-      cdn: splTokenRegistry.Strategy.CDN,
-    };
     const allTokenList =
       await new splTokenRegistry.TokenListProvider().resolve();
     const tokenListOnEndpoint = allTokenList.filterByChainId(
@@ -120,7 +103,7 @@ const getTokenBalance = async (req, res) => {
     }
     tokens = tokens.sort((a, b) => {
       return b.amount - a.amount;
-    }); // b-a: 오름차순, a-b: 내림차순
+    });
     return cwr.createWebResp(res, 200, {tokens, result});
   } catch (e) {
     return cwr.errorWebResp(res, 500, 'E0000 - getTokenBalance', e.message);
@@ -167,19 +150,6 @@ const getTransaction = async (req, res) => {
 
 const postAirdropFromAddress = async (req, res) => {
   try {
-    /*
-    // http-rpc prototype
-    const {address, value} = req.query;
-    const url = clusterApiUrl(req.network);
-    const options = {
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'requestAirdrop',
-      params: [address, Number(fromSOL(value))],
-    };
-    const result = await axios.post(url, options);
-    const data = result?.data;
-    */
     const {address} = req.query;
     const publicKey = new PublicKey(address);
     const beforeBalance = toSOL(await req.connection.getBalance(publicKey));
@@ -226,7 +196,7 @@ const postDecodeMnemonic = async (req, res) => {
         publicKey: account.publicKey.toString(),
         privateKey: account.secretKey.toString('hex'),
         keypairSecretKey: keypair.secretKey.toString(),
-        walletProvidor: walletProvidor[item],
+        walletProvider: walletProvider[item],
       };
     }
     return cwr.createWebResp(res, 200, wallet);
@@ -291,17 +261,8 @@ const postSend = async (req, res) => {
 
 const postTokenSend = async (req, res) => {
   try {
-    const {
-      // owner,
-      fromPrivateKey,
-      fromMnemonic,
-      sourcePublicKey,
-      toAddress,
-      amount,
-      memo,
-      mintAddress,
-      decimals,
-    } = req.body;
+    const {fromPrivateKey, fromMnemonic, toAddress, amount, memo, mintAddress} =
+      req.body;
 
     let from;
     if (fromMnemonic) {
@@ -320,69 +281,126 @@ const postTokenSend = async (req, res) => {
     }
     const to = new PublicKey(toAddress);
     const mint = new PublicKey(mintAddress);
-
-    const destinationAccountInfo = await req.connection.getAccountInfo(to);
+    const token = new Token(req.connection, mint, TOKEN_PROGRAM_ID, [from]);
+    const tokenInfo = await token.getMintInfo();
+    const fromInfo = await req.connection.getAccountInfo(from.publicKey);
+    const toInfo = await req.connection.getAccountInfo(to);
+    const balance = Number(amount);
+    let fromToken;
+    let toToken;
     const transaction = new Transaction();
 
-    if (
-      !!destinationAccountInfo &&
-      destinationAccountInfo.owner.equals(TOKEN_PROGRAM_ID)
-    ) {
-      await transferBetweenSplTokenAccounts({
-        connection: req.connection,
-        owner: from,
-        mint,
-        decimals,
-        sourcePublicKey,
-        destinationPublicKey: to,
-        amount,
-        memo,
-      });
-    } else {
-      const destinationAssociatedTokenAddress = (
-        await PublicKey.findProgramAddress(
-          [
-            to.toBuffer(),
-            TokenInstructions.TOKEN_PROGRAM_ID.toBuffer(),
-            mint.toBuffer(),
-          ],
-          ASSOCIATED_TOKEN_PROGRAM_ID,
-        )
-      )[0];
-      /* destinationAccountInfo = await req.connection.getAccountInfo(
-        destinationAssociatedTokenAddress,
-      ); */
-      if (!destinationAccountInfo || destinationAccountInfo.lamports === 0) {
-        throw new Error('Cannot send to address with zero SOL balances');
-      } else if (
-        !!destinationAccountInfo &&
-        destinationAccountInfo.owner.equals(TOKEN_PROGRAM_ID)
-      ) {
-      } else {
-        const [createAccountInstruction, newAddress] =
-          await createAssociatedTokenAccountIx(from.publicKey, to, mint);
-        transaction.add(
-          assertOwner({
-            account: to,
-            owner: SystemProgram.programId,
-          }),
+    if (fromInfo.owner !== TOKEN_PROGRAM_ID) {
+      const fromResp = await req.connection.getParsedTokenAccountsByOwner(
+        from.publicKey,
+        {mint},
+      );
+      const fromResult = fromResp.value.map(
+        ({pubkey, account: {data, executable, owner, lamports}}) => ({
+          publicKey: new PublicKey(pubkey),
+          accountInfo: {
+            data,
+            executable,
+            owner: new PublicKey(owner),
+            lamports,
+          },
+        }),
+      );
+      const fromTokenInfo = await token.getAccountInfo(fromResult[0].publicKey);
+      const fromTokenAmount =
+        fromTokenInfo.amount.toNumber() / 10 ** tokenInfo.decimals;
+      if (fromTokenAmount < balance) {
+        return cwr.errorWebResp(
+          res,
+          500,
+          `E0000 - postTokenSend`,
+          'less input amount than accountBalance',
         );
-        transaction.add(createAccountInstruction);
-        const transferBetweenAccountsTxn =
-          createTransferBetweenSplTokenAccountsInstruction({
-            ownerPublicKey: from.publicKey,
-            mint,
-            decimals,
-            sourcePublicKey,
-            destinationPublicKey: newAddress,
-            amount,
-            memo,
-          });
-        transaction.add(transferBetweenAccountsTxn);
       }
+
+      fromToken = fromResult[0].publicKey;
+    } else {
+      return cwr.errorWebResp(
+        res,
+        500,
+        `E0000 - postTokenSend`,
+        "input you'r account privateKey",
+      );
     }
 
-    return cwr.createWebResp(res, 200, {});
+    if (toInfo.owner !== TOKEN_PROGRAM_ID) {
+      const toResp = await req.connection.getParsedTokenAccountsByOwner(to, {
+        mint,
+      });
+      const toResult = toResp.value.map(
+        ({pubkey, account: {data, executable, owner, lamports}}) => ({
+          publicKey: new PublicKey(pubkey),
+          accountInfo: {
+            data,
+            executable,
+            owner: new PublicKey(owner),
+            lamports,
+          },
+        }),
+      );
+      if (toResult.length === 1) {
+        toToken = toResult[0].publicKey;
+        transaction.add(
+          transferChecked({
+            source: fromToken,
+            mint,
+            decimals: tokenInfo.decimals,
+            destination: toToken,
+            owner: from.publicKey,
+            amount: amount * 10 ** tokenInfo.decimals,
+          }),
+        );
+        if (memo) {
+          transaction.add(memoInstruction(memo));
+        }
+      } else if (toResult.length === 0) {
+        transaction.add(
+          await createAndTransferToAccount(
+            from,
+            fromToken,
+            to,
+            amount * 10 ** tokenInfo.decimals,
+            memo,
+            mint,
+            tokenInfo.decimals,
+          ),
+        );
+      } else {
+        return cwr.errorWebResp(
+          res,
+          500,
+          `E0000 - postTokenSend`,
+          "error.... i don't know.....",
+        );
+      }
+    } else {
+      toToken = to;
+      transaction.add(
+        transferChecked({
+          source: fromToken,
+          mint,
+          decimals: tokenInfo.decimals,
+          destination: toToken,
+          owner: from.publicKey,
+          amount: amount * 10 ** tokenInfo.decimals,
+        }),
+      );
+      if (memo) {
+        transaction.add(memoInstruction(memo));
+      }
+    }
+    const signature = await sendAndConfirmTransaction(
+      req.connection,
+      transaction,
+      [from],
+    );
+    const tx = await req.connection.getTransaction(signature);
+    return cwr.createWebResp(res, 200, {signature, tx});
   } catch (e) {
     return cwr.errorWebResp(res, 500, `E0000 - postTokenSend`, e.message);
   }
@@ -406,17 +424,6 @@ const getValidatorList = async (req, res) => {
 const getStakeInfo = async (req, res) => {
   try {
     const {address} = req.query;
-    /*
-    // http-rpc prototype
-    const url = req.endpoint;
-    const result = await axios.post(url, {
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'getStakeActivation',
-      params: [address],
-    });
-    const data = result?.data;
-    */
     const publicKey = new PublicKey(address);
     const stakeInfo = await req.connection.getStakeActivation(publicKey);
     return cwr.createWebResp(res, 200, {stakeInfo});
@@ -460,7 +467,6 @@ const postStake = async (req, res) => {
         stakePubkey: stakeAccount.publicKey,
         authorized,
         lamports: fromSOL(balance),
-        // lockup: new Lockup(0,0,new PublicKey(0)),
       }),
     );
     const signature = await sendAndConfirmTransaction(
@@ -557,13 +563,12 @@ const postDeactivate = async (req, res) => {
       StakeProgram.deactivate({
         authorizedPubkey: from.publicKey,
         stakePubkey: new PublicKey(stakePublicKey),
-        // votePubkey: votePubkey,
       }),
     );
     const signature = await sendAndConfirmTransaction(
       req.connection,
       transaction,
-      [from], //
+      [from],
     );
     const tx = await req.connection.getTransaction(signature);
     return cwr.createWebResp(res, 200, {signature, tx});
@@ -793,6 +798,55 @@ const getTokenInfo = async (req, res) => {
   }
 };
 
+const postCreateTokenAccount = async (req, res) => {
+  try {
+    const {fromMnemonic, fromPrivateKey, mintPublicKey} = req.body;
+    let from;
+    if (fromMnemonic) {
+      const seed = bip39.mnemonicToSeedSync(fromMnemonic);
+      from = Keypair.fromSeed(seed.slice(0, 32));
+    } else if (fromPrivateKey) {
+      const privKey = Uint8Array.from(fromPrivateKey.split(','));
+      from = Keypair.fromSecretKey(privKey);
+    } else {
+      return cwr.errorWebResp(
+        res,
+        500,
+        `E0000 - postSendSol`,
+        'input one of fromMnemonic or fromPrivateKey',
+      );
+    }
+    const transaction = new Transaction();
+    const mint = new PublicKey(mintPublicKey);
+    const [ix, address] = await createAssociatedTokenAccountIx(
+      from.publicKey,
+      from.publicKey,
+      mint,
+    );
+    transaction.add(ix);
+    transaction.feePayer = from.publicKey;
+    const signature = await sendAndConfirmTransaction(
+      req.connection,
+      transaction,
+      [from],
+    );
+    const tx = await req.connection.getTransaction(signature);
+
+    return cwr.createWebResp(res, 200, {
+      signature,
+      address,
+      tx,
+    });
+  } catch (e) {
+    return cwr.errorWebResp(
+      res,
+      500,
+      `E0000 - postCreateTokenAccount`,
+      e.message,
+    );
+  }
+};
+
 module.exports = {
   getTokenInfo,
   getBalance,
@@ -811,4 +865,5 @@ module.exports = {
   postDeactivate,
   postWithdraw,
   postMintToken,
+  postCreateTokenAccount,
 };
