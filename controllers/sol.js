@@ -170,11 +170,18 @@ const getAccountDetail = async (req, res) => {
     let results;
     if (transactions && txHashes) {
       txHashes.map((txHash) =>
-        promises.push(req.connection.getTransaction(txHash)),
+        // promises.push(req.connection.getTransaction(txHash)),
+        promises.push(
+          axios.get(
+            `https://${
+              networks[req.network]
+            }.solscan.io/transaction?tx=${txHash}`,
+          ),
+        ),
       );
       results = await Promise.all(promises);
       for (let i = 0; i < transactions.length; i += 1) {
-        transactions[i].txDetail = results[i];
+        transactions[i].txDetail = results[i].data;
       }
       return cwr.createWebResp(res, 200, {transactions});
     }
