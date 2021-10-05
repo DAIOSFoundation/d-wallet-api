@@ -11,6 +11,13 @@ router.post(
   rayController.postStake,
 );
 
+router.post(
+  '/harvest',
+  mw.checkMnemonic,
+  mw.solanaNetwork,
+  rayController.postHarvest,
+);
+
 router.post('/unStake', mw.solanaNetwork, rayController.postUnStake);
 
 router.get('/stakeAccounts', mw.solanaNetwork, rayController.getStakeAccounts);

@@ -2654,7 +2654,7 @@ const getInfoAccount = async (accountAddress, connection) => {
     item.farmInfo = multipleInfo.find(
       ({account}) =>
         account.data.poolLpTokenAccount.toString() === item.poolLpTokenAccount,
-    );
+    ).account;
     item.account.data.depositBalance = new TokenAmount(
       getBigNumber(item.account.data.depositBalance),
       item.decimals,
@@ -2666,7 +2666,7 @@ const getInfoAccount = async (accountAddress, connection) => {
     item.rewardDebt = new TokenAmount(
       item.account.data.depositBalance.wei
         .multipliedBy(
-          getBigNumber(item.farmInfo.account.data.rewardPerShareNet),
+          getBigNumber(item.farmInfo.data.rewardPerShareNet),
         )
         .dividedBy(1e9)
         .minus(item.account.data.rewardDebt.wei),
