@@ -2645,6 +2645,9 @@ const getInfoAccount = async (accountAddress, connection) => {
     item.decimals = FARMS.find((farm) => {
       return farm.poolId === item.account.data.poolId.toString();
     }).reward.decimals;
+    item.poolId = FARMS.find((farm) => {
+      return farm.poolId === item.account.data.poolId.toString();
+    }).poolId;
     item.name = FARMS.find((farm) => {
       return farm.poolId === item.account.data.poolId.toString();
     }).name;
