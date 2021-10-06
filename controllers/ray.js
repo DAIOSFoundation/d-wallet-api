@@ -43,12 +43,14 @@ const postStake = async (req, res) => {
     let infoAccount;
     if (!toStakeAccount) {
       infoAccount = await getInfoAccount(wallet.publicKey, req.connection);
-      infoAccount = infoAccount.find((item) => {
-        return item.poolId === farmInfo.poolId;
-      });
-      if (!infoAccount) {
-        const message = `RAY 스테이킹 계좌를 찾을 수 없습니다. 관리자에게 문의하세요....`;
-        return cwr.errorWebResp(res, 500, `E0000 - postUnstake`, message);
+      if (infoAccount.length > 0) {
+        infoAccount = infoAccount.find((item) => {
+          return item.poolId === farmInfo.poolId;
+        });
+        if (!infoAccount) {
+          const message = `RAY 스테이킹 계좌를 찾을 수 없습니다. 관리자에게 문의하세요....`;
+          return cwr.errorWebResp(res, 500, `E0000 - postUnstake`, message);
+        }
       }
     } else {
       infoAccount = {publicKey: new PublicKey(toStakeAccount)};

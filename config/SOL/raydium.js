@@ -64,6 +64,10 @@ const fromSOL = (value, decimals) => {
   return value * 10 ** (decimals || 9);
 };
 
+const STAKE_PROGRAM_ID = 'EhhTKczWMGQt46ynNeRX1WfeagwwJd7ufHvCDjRxjo5Q';
+const STAKE_PROGRAM_ID_V4 = 'CBuCnLe26faBpcBP2fktp4rp8abpcAnTWft6ZrP5Q4T';
+const STAKE_PROGRAM_ID_V5 = '9KEPoZmtHUrBbhWN1v1KWLMkkvwY6WLtAVUCPRtRjP4z';
+
 const TOKEN_PROGRAM_ID = new PublicKey(
   'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
 );
@@ -71,10 +75,6 @@ const TOKEN_PROGRAM_ID = new PublicKey(
 const WRAPPED_SOL_MINT = new PublicKey(
   'So11111111111111111111111111111111111111112',
 );
-
-const STAKE_PROGRAM_ID = 'EhhTKczWMGQt46ynNeRX1WfeagwwJd7ufHvCDjRxjo5Q';
-const STAKE_PROGRAM_ID_V4 = 'CBuCnLe26faBpcBP2fktp4rp8abpcAnTWft6ZrP5Q4T';
-const STAKE_PROGRAM_ID_V5 = '9KEPoZmtHUrBbhWN1v1KWLMkkvwY6WLtAVUCPRtRjP4z';
 
 const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey(
   'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
@@ -2361,16 +2361,6 @@ LAYOUT.addVariant(
   'transferChecked',
 );
 
-const instructionMaxSpan = Math.max(
-  ...Object.values(LAYOUT.registry).map((r) => r.span),
-);
-
-function encodeTokenInstructionData(instruction) {
-  const b = Buffer.alloc(instructionMaxSpan);
-  const span = LAYOUT.encode(instruction, b);
-  return b.slice(0, span);
-}
-
 const createAssociatedTokenAccountIfNotExist = async (
   account,
   owner,
@@ -2465,17 +2455,14 @@ const getBigNumber = (num) => {
 
 const depositInstruction = (
   programId,
-  // staking pool
   poolId,
   poolAuthority,
-  // user
   userInfoAccount,
   userOwner,
   userLpTokenAccount,
   poolLpTokenAccount,
   userRewardTokenAccount,
   poolRewardTokenAccount,
-  // tokenProgramId: PublicKey,
   amount,
 ) => {
   const dataLayout = struct([u8('instruction'), nu64('amount')]);
@@ -2511,17 +2498,14 @@ const depositInstruction = (
 
 const withdrawInstruction = (
   programId,
-  // staking pool
   poolId,
   poolAuthority,
-  // user
   userInfoAccount,
   userOwner,
   userLpTokenAccount,
   poolLpTokenAccount,
   userRewardTokenAccount,
   poolRewardTokenAccount,
-  // tokenProgramId: PublicKey,
   amount,
 ) => {
   const dataLayout = struct([u8('instruction'), nu64('amount')]);
