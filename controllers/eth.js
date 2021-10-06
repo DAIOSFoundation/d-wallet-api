@@ -559,6 +559,32 @@ const getSubscription = async (req, res) => {
   }
 };
 
+const getBlockConfirmation = async (req, res) => {
+  try {
+    const {transactionHash} = req.query;
+    const tx = await req.web3.eth.getTransaction(transactionHash);
+    const latestBlock = await req.web3.eth.getBlock('latest');
+    if (!tx?.blockNumber || !latestBlock?.number) {
+      return cwr.errorWebResp(
+        res,
+        500,
+        'E0000 - getBlockConfirmation',
+        'BlockConfirmation calculate fail.',
+      );
+    }
+    return cwr.createWebResp(res, 200, {
+      BlockConfirmation: latestBlock.number - tx.blockNumber + 1,
+    });
+  } catch (e) {
+    return cwr.errorWebResp(
+      res,
+      500,
+      'E0000 - getBlockConfirmation',
+      e || e.message,
+    );
+  }
+};
+
 module.exports = {
   postDecodeMnemonic,
   getEtherBalance,
@@ -581,4 +607,5 @@ module.exports = {
   getAbi,
   postSyncBlock,
   getSubscription,
+  getBlockConfirmation,
 };

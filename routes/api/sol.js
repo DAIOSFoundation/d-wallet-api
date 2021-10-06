@@ -75,4 +75,10 @@ router.post('/mintToken', mw.solanaNetwork, solController.postMintToken);
 
 router.get('/tokenInfo', mw.solanaNetwork, solController.getTokenInfo);
 
+router.get(
+  '/blockConfirmation',
+  mw.solanaNetwork,
+  solController.getBlockConfirmation,
+);
+
 module.exports = router;

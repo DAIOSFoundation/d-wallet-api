@@ -824,6 +824,32 @@ const getTokenInfo = async (req, res) => {
   }
 };
 
+const getBlockConfirmation = async (req, res) => {
+  try {
+    const {transactionHash} = req.query;
+    const slot = await req.connection.getSlot();
+    const tx = await req.connection.getTransaction(transactionHash);
+    if (!slot || !tx) {
+      return cwr.errorWebResp(
+        res,
+        500,
+        `E0000 - getBlockConfirmation`,
+        'BlockConfirmation calculate fail.',
+      );
+    }
+    return cwr.createWebResp(res, 200, {
+      blockConfirmation: slot - tx.slot,
+    });
+  } catch (e) {
+    return cwr.errorWebResp(
+      res,
+      500,
+      `E0000 - getBlockConfirmation`,
+      e.message,
+    );
+  }
+};
+
 const postCreateTokenAccount = async (req, res) => {
   try {
     const {fromMnemonic, fromPrivateKey, mintPublicKey} = req.body;
@@ -893,4 +919,5 @@ module.exports = {
   postWithdraw,
   postMintToken,
   postCreateTokenAccount,
+  getBlockConfirmation,
 };

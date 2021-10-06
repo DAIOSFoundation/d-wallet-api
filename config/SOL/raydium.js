@@ -2665,9 +2665,7 @@ const getInfoAccount = async (accountAddress, connection) => {
     );
     item.rewardDebt = new TokenAmount(
       item.account.data.depositBalance.wei
-        .multipliedBy(
-          getBigNumber(item.farmInfo.data.rewardPerShareNet),
-        )
+        .multipliedBy(getBigNumber(item.farmInfo.data.rewardPerShareNet))
         .dividedBy(1e9)
         .minus(item.account.data.rewardDebt.wei),
       item.decimals,

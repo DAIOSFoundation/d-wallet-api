@@ -56,4 +56,6 @@ router.post('/syncBlock', mw.web3, ethController.postSyncBlock);
 
 router.get('/subscription', mw.web3WS, ethController.getSubscription);
 
+router.get('/blockConfirmation', mw.web3, ethController.getBlockConfirmation);
+
 module.exports = router;
