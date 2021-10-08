@@ -133,7 +133,7 @@ const getTransaction = async (req, res) => {
 
 const getAccountDetail = async (req, res) => {
   try {
-    const {address} = req.query;
+    const {address, before} = req.query;
     const networks = {
       'mainnet-beta': 'api',
       devnet: 'api-devnet',
@@ -141,7 +141,7 @@ const getAccountDetail = async (req, res) => {
     };
     const url = `https://${
       networks[req.network]
-    }.solscan.io/account/transaction?address=${address}`;
+    }.solscan.io/account/transaction?address=${address}&before=${before}`;
     const response = await axios.get(url);
     const transactions = response?.data?.data;
     const txHashes = [];
