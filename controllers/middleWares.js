@@ -257,6 +257,20 @@ const solanaNetwork = async (req, res, next) => {
   }
 };
 
+const solscanNetwork = async (req, res, next) => {
+  try {
+    const networks = {
+      'mainnet-beta': 'api',
+      devnet: 'api-devnet',
+      testnet: 'api-testnet',
+    };
+    req.solscanUrl = `https://${networks[req.network]}.solscan.io`;
+    next();
+  } catch (e) {
+    return cwr.errorWebResp(res, 500, `E0000 - solscanNetwork`, e.message);
+  }
+};
+
 /// /////////////////// Middleware for Aave //////////////////////
 const aaveNetwork = async (req, res, next) => {
   try {
@@ -372,4 +386,5 @@ module.exports = {
   upload,
   multerInitialize,
   solanaNetwork,
+  solscanNetwork,
 };

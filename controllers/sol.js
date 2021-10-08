@@ -134,24 +134,13 @@ const getTransaction = async (req, res) => {
 const getAccountDetail = async (req, res) => {
   try {
     const {address, before} = req.query;
-    const networks = {
-      'mainnet-beta': 'api',
-      devnet: 'api-devnet',
-      testnet: 'api-testnet',
-    };
+    const {solscanUrl} = req;
     let url = '';
     if (before) {
-      url = `https://${
-        networks[req.network]
-      }.solscan.io/account/transaction?address=${address}&before=${before}`;
+      url = `${solscanUrl}/account/transaction?address=${address}&before=${before}`;
     } else {
-      url = `https://${
-        networks[req.network]
-      }.solscan.io/account/transaction?address=${address}`;
+      url = `${solscanUrl}/account/transaction?address=${address}`;
     }
-    // const url = `https://${
-    //   networks[req.network]
-    // }.solscan.io/account/transaction?address=${address}&before=${before}`;
     const response = await axios.get(url);
     const transactions = response?.data?.data;
     const txHashes = [];
@@ -164,13 +153,7 @@ const getAccountDetail = async (req, res) => {
     if (transactions && txHashes) {
       txHashes.map((txHash) =>
         // promises.push(req.connection.getTransaction(txHash)),
-        promises.push(
-          axios.get(
-            `https://${
-              networks[req.network]
-            }.solscan.io/transaction?tx=${txHash}`,
-          ),
-        ),
+        promises.push(axios.get(`${solscanUrl}/transaction?tx=${txHash}`)),
       );
       results = await Promise.all(promises);
       for (let i = 0; i < transactions.length; i += 1) {
@@ -181,6 +164,38 @@ const getAccountDetail = async (req, res) => {
     return cwr.errorWebResp(res, 500, 'E0000 - getAccountDetail');
   } catch (e) {
     return cwr.errorWebResp(res, 500, 'E0000 - getAccountDetail', e.message);
+  }
+};
+
+const getSolTransfer = async (req, res) => {
+  try {
+    const {account, limit, offset} = req.query;
+    const {solscanUrl} = req;
+    const response = await axios.get(
+      `${solscanUrl}/account/soltransfer/txs?address=${account}&limit=${
+        limit || 10
+      }&offset=${offset || 0}`,
+    );
+    const {transactions} = response.data.data.tx;
+    return cwr.createWebResp(res, 200, {transactions});
+  } catch (e) {
+    return cwr.errorWebResp(res, 500, 'E0000 - getSolTransfer', e.message);
+  }
+};
+
+const getSplTransfer = async (req, res) => {
+  try {
+    const {account, limit, offset} = req.query;
+    const {solscanUrl} = req;
+    const response = await axios.get(
+      `${solscanUrl}/account/token/txs?address=${account}&limit=${
+        limit || 10
+      }&offset=${offset || 0}`,
+    );
+    const {transactions} = response.data.data.tx;
+    return cwr.createWebResp(res, 200, {transactions});
+  } catch (e) {
+    return cwr.errorWebResp(res, 500, 'E0000 - getSplTransfer', e.message);
   }
 };
 
@@ -917,6 +932,8 @@ module.exports = {
   getTransaction,
   postDecodeMnemonic,
   getAccountDetail,
+  getSolTransfer,
+  getSplTransfer,
   postAirdropFromAddress,
   postSend,
   postTokenSend,
