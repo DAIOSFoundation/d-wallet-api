@@ -139,9 +139,19 @@ const getAccountDetail = async (req, res) => {
       devnet: 'api-devnet',
       testnet: 'api-testnet',
     };
-    const url = `https://${
-      networks[req.network]
-    }.solscan.io/account/transaction?address=${address}&before=${before}`;
+    let url = '';
+    if (before) {
+      url = `https://${
+        networks[req.network]
+      }.solscan.io/account/transaction?address=${address}&before=${before}`;
+    } else {
+      url = `https://${
+        networks[req.network]
+      }.solscan.io/account/transaction?address=${address}`;
+    }
+    // const url = `https://${
+    //   networks[req.network]
+    // }.solscan.io/account/transaction?address=${address}&before=${before}`;
     const response = await axios.get(url);
     const transactions = response?.data?.data;
     const txHashes = [];
