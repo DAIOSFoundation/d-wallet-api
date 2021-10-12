@@ -1,7 +1,10 @@
 # D WALLET API
-Wallet API for
+Integrated Blockchain API
 
-API for BTC, ETH, XLM, ERC20, Aave
+Blockchain Wallet API for 
+
+BTC, ETH(ERC20), SOL(SPL Tokens), XLM(Assets), Aave, ORBS, TRX, etc...
+
 
 # Install
 Copy .env.sample and set

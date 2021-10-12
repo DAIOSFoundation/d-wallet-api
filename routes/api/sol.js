@@ -10,7 +10,26 @@ router.get('/block', mw.solanaNetwork, solController.getBlock);
 
 router.get('/transaction', mw.solanaNetwork, solController.getTransaction);
 
-router.get('/accountDetail', mw.solanaNetwork, solController.getAccountDetail);
+router.get(
+  '/accountDetail',
+  mw.solanaNetwork,
+  mw.solscanNetwork,
+  solController.getAccountDetail,
+);
+
+router.get(
+  '/solTransfer',
+  mw.solanaNetwork,
+  mw.solscanNetwork,
+  solController.getSolTransfer,
+);
+
+router.get(
+  '/splTransfer',
+  mw.solanaNetwork,
+  mw.solscanNetwork,
+  solController.getSplTransfer,
+);
 
 router.get(
   '/airdropFromAddress',

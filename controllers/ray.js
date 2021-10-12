@@ -25,7 +25,7 @@ const {
   TokenAmount,
 } = require('../config/SOL/raydiumStruct');
 const {LIQUIDITY_POOLS} = require('../config/SOL/raydiumPools');
-const addLiquidityInstruction = require("../config/SOL/raydiumPools");
+const addLiquidityInstruction = require('../config/SOL/raydiumPools');
 
 const postStake = async (req, res) => {
   try {
