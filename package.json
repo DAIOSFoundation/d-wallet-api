@@ -14,6 +14,7 @@
     "@solana/spl-token-registry": "^0.2.268",
     "@solana/web3.js": "^1.29.1",
     "axios": "^0.21.4",
+    "bignumber.js": "^9.0.1",
     "bip32": "^2.0.6",
     "bip39": "^3.0.4",
     "bitcoin-core": "^3.0.0",
@@ -47,8 +48,7 @@
     "web3": "^1.5.3",
     "winston": "^3.3.3",
     "winston-daily-rotate-file": "^4.5.5",
-    "xdr-parser": "^1.0.8",
-    "bignumber.js": "^9.0.1"
+    "xdr-parser": "^1.0.8"
   },
   "devDependencies": {
     "eslint": "^7.32.0",

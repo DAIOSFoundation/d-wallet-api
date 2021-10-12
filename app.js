@@ -1,5 +1,5 @@
 // SET Development mode or Production mode
-// UNIX : export NODE_ENV=development
+// UNIX : NODE_ENV=development
 // Windows : set NODE_ENV=production
 
 process.env.NODE_ENV =

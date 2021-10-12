@@ -1,0 +1,98 @@
+const {PublicKey} = require('@solana/web3.js');
+
+const WRAPPED_SOL_MINT = new PublicKey(
+  'So11111111111111111111111111111111111111112',
+);
+const SYSTEM_PROGRAM_ID = new PublicKey('11111111111111111111111111111111');
+const TOKEN_PROGRAM_ID = new PublicKey(
+  'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+);
+const MEMO_PROGRAM_ID = new PublicKey(
+  'Memo1UhkJRfHyvLMcVucJwxXeuD728EqVDDwQDxFMNo',
+);
+const RENT_PROGRAM_ID = new PublicKey(
+  'SysvarRent111111111111111111111111111111111',
+);
+const CLOCK_PROGRAM_ID = new PublicKey(
+  'SysvarC1ock11111111111111111111111111111111',
+);
+const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey(
+  'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
+);
+const SERUM_PROGRAM_ID_V2 = new PublicKey(
+  'EUqojwWA2rd19FZrzeBncJsm38Jm1hEhE3zsmX3bRc2o',
+);
+const SERUM_PROGRAM_ID_V3 = new PublicKey(
+  '9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin',
+);
+const LIQUIDITY_POOL_PROGRAM_ID_V2 = new PublicKey(
+  'RVKd61ztZW9GUwhRbbLoYVRE5Xf1B2tVscKqwZqXgEr',
+);
+const LIQUIDITY_POOL_PROGRAM_ID_V3 = new PublicKey(
+  '27haf8L6oxUeXrHrgEgsexjSY5hbVUWEmvv9Nyxg8vQv',
+);
+const LIQUIDITY_POOL_PROGRAM_ID_V4 = new PublicKey(
+  '675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8',
+);
+const STAKE_PROGRAM_ID = new PublicKey(
+  'EhhTKczWMGQt46ynNeRX1WfeagwwJd7ufHvCDjRxjo5Q',
+);
+const STAKE_PROGRAM_ID_V4 = new PublicKey(
+  'CBuCnLe26faBpcBP2fktp4rp8abpcAnTWft6ZrP5Q4T',
+);
+const STAKE_PROGRAM_ID_V5 = new PublicKey(
+  '9KEPoZmtHUrBbhWN1v1KWLMkkvwY6WLtAVUCPRtRjP4z',
+);
+const IDO_PROGRAM_ID = new PublicKey(
+  '6FJon3QE27qgPVggARueB22hLvoh22VzJpXv4rBEoSLF',
+);
+const IDO_PROGRAM_ID_V2 = new PublicKey(
+  'CC12se5To1CdEuw7fDS27B7Geo5jJyL7t5UK2B44NgiH',
+);
+const IDO_PROGRAM_ID_V3 = new PublicKey(
+  '9HzJyW1qZsEiSfMUf6L2jo3CcTKAyBmSyKdwQeYisHrC',
+);
+const OWNER_VALIDATION_PROGRAM_ID = new PublicKey(
+  '4MNPdKu9wFMvEeZBMt3Eipfs5ovVWTJb31pEXDJAAxX5',
+);
+
+const AUTHORITY_AMM = 'amm authority';
+const AMM_ASSOCIATED_SEED = 'amm_associated_seed';
+const TARGET_ASSOCIATED_SEED = 'target_associated_seed';
+const WITHDRAW_ASSOCIATED_SEED = 'withdraw_associated_seed';
+const OPEN_ORDER_ASSOCIATED_SEED = 'open_order_associated_seed';
+const COIN_VAULT_ASSOCIATED_SEED = 'coin_vault_associated_seed';
+const PC_VAULT_ASSOCIATED_SEED = 'pc_vault_associated_seed';
+const LP_MINT_ASSOCIATED_SEED = 'lp_mint_associated_seed';
+const TEMP_LP_TOKEN_ASSOCIATED_SEED = 'temp_lp_token_associated_seed';
+
+module.exports = {
+  WRAPPED_SOL_MINT,
+  SYSTEM_PROGRAM_ID,
+  TOKEN_PROGRAM_ID,
+  MEMO_PROGRAM_ID,
+  RENT_PROGRAM_ID,
+  CLOCK_PROGRAM_ID,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  SERUM_PROGRAM_ID_V2,
+  SERUM_PROGRAM_ID_V3,
+  LIQUIDITY_POOL_PROGRAM_ID_V2,
+  LIQUIDITY_POOL_PROGRAM_ID_V3,
+  LIQUIDITY_POOL_PROGRAM_ID_V4,
+  STAKE_PROGRAM_ID,
+  STAKE_PROGRAM_ID_V4,
+  STAKE_PROGRAM_ID_V5,
+  IDO_PROGRAM_ID,
+  IDO_PROGRAM_ID_V2,
+  IDO_PROGRAM_ID_V3,
+  OWNER_VALIDATION_PROGRAM_ID,
+  AUTHORITY_AMM,
+  AMM_ASSOCIATED_SEED,
+  TARGET_ASSOCIATED_SEED,
+  WITHDRAW_ASSOCIATED_SEED,
+  OPEN_ORDER_ASSOCIATED_SEED,
+  COIN_VAULT_ASSOCIATED_SEED,
+  PC_VAULT_ASSOCIATED_SEED,
+  LP_MINT_ASSOCIATED_SEED,
+  TEMP_LP_TOKEN_ASSOCIATED_SEED,
+};

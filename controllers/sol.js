@@ -15,13 +15,7 @@ const {
 } = require('@solana/web3.js');
 const bip39 = require('bip39');
 const splTokenRegistry = require('@solana/spl-token-registry');
-const {
-  Token,
-  ASSOCIATED_TOKEN_PROGRAM_ID,
-  TOKEN_PROGRAM_ID,
-  u64,
-} = require('@solana/spl-token');
-const {TokenInstructions} = require('@project-serum/serum');
+const {Token, TOKEN_PROGRAM_ID} = require('@solana/spl-token');
 const cwr = require('../utils/createWebResp');
 const {
   toSOL,
@@ -85,6 +79,7 @@ const getTokenBalance = async (req, res) => {
       envEndpoint[req.network],
     );
     const tokenList = tokenListOnEndpoint.getList();
+    // eslint-disable-next-line guard-for-in,no-restricted-syntax
     for (const i in result) {
       const tokenInfo = tokenList.find((token) => {
         return token.address === result[i].accountInfo.data.parsed.info.mint;
@@ -204,6 +199,7 @@ const postDecodeMnemonic = async (req, res) => {
     const wallet = {
       bip39Seed: seed.toString('hex'),
     };
+    // eslint-disable-next-line guard-for-in,no-restricted-syntax
     for (const item in DERIVATION_PATH) {
       const account = getAccountFromSeed(
         seed,
@@ -777,10 +773,12 @@ const postMintToken = async (req, res) => {
       },
       mint: {
         publicKey: mint.publicKey.toString(),
+        // eslint-disable-next-line no-underscore-dangle
         secretKey: mint._keypair.secretKey.toString(),
       },
       initialAccount: {
         publicKey: initialAccount.publicKey.toString(),
+        // eslint-disable-next-line no-underscore-dangle
         secretKey: initialAccount._keypair.secretKey.toString(),
       },
       tx,

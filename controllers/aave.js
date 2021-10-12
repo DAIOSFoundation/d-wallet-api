@@ -15,6 +15,10 @@ const postApprove = async (req, res) => {
       tokenABI.AaveABI,
       aave.addressSwitch[req.endpoint].stkaave,
     );
+    const standardContract = new req.web3.eth.Contract(
+      StandardTokenABI.StandardABI,
+      aave.addressSwitch[req.endpoint].aave,
+    );
     const contractRawTx = await tokenContract.methods
       .approve(
         aave.addressSwitch[req.endpoint].stkaave,
@@ -32,6 +36,12 @@ const postApprove = async (req, res) => {
       value: '0x0',
     };
     const signedTx = await account.signTransaction(rawTx);
+    const allowance = await standardContract.methods
+      .allowance(myWalletAddress, aave.addressSwitch[req.endpoint].stkaave)
+      .call();
+    if (allowance || allowance === MAX_INT) {
+      return cwr.createWebResp(res, 200, 'already approve on AAVE.');
+    }
     const txInfo = await req.web3.eth.sendSignedTransaction(
       signedTx.rawTransaction,
     );
@@ -241,7 +251,6 @@ const postCooldown = async (req, res) => {
 const getStakersInfo = async (req, res) => {
   try {
     const {address} = req.query;
-
     const tokenContract = new req.web3.eth.Contract(
       tokenABI.AaveABI,
       aave.addressSwitch[req.endpoint].stkaave,
@@ -258,7 +267,7 @@ const getStakersInfo = async (req, res) => {
       await tokenContract.methods.stakerRewardsToClaim(address).call(),
       'ether',
     );
-    const currentRewardsBalance = new Number(
+    const currentRewardsBalance = Number(
       req.web3.utils.fromWei(
         await tokenContract.methods.getTotalRewardsBalance(address).call(),
         'ether',
@@ -278,6 +287,9 @@ const getStakersInfo = async (req, res) => {
     );
     const balance =
       (await standardContract.methods.balanceOf(address).call()) / decimal;
+    const allowance = await standardContract.methods
+      .allowance(address, aave.addressSwitch[req.endpoint].stkaave)
+      .call();
     const data = {
       balance,
       stakedBalance,
@@ -287,6 +299,7 @@ const getStakersInfo = async (req, res) => {
       stakersCooldowns,
       COOLDOWN_SECONDS,
       UNSTAKE_WINDOW,
+      allowance: allowance === MAX_INT ? 'max allowance' : allowance,
     };
     return cwr.createWebResp(res, 200, data);
   } catch (e) {

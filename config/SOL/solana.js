@@ -9,8 +9,19 @@ const {
 } = require('@solana/web3.js');
 const bip32 = require('bip32');
 const {derivePath} = require('ed25519-hd-key');
-const BufferLayout = require('buffer-layout');
 const {TokenInstructions} = require('@project-serum/serum');
+const {
+  instructionMaxSpan,
+  OWNER_VALIDATION_LAYOUT,
+  DERIVATION_PATH,
+} = require('./solanaStruct');
+const {LAYOUT} = require('./raydiumStruct');
+const {
+  MEMO_PROGRAM_ID,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  OWNER_VALIDATION_PROGRAM_ID,
+  TOKEN_PROGRAM_ID,
+} = require('./ProgramIds');
 
 const toSOL = (value, decimals) => {
   return value / 10 ** (decimals || 9);
@@ -19,37 +30,7 @@ const fromSOL = (value, decimals) => {
   return value * 10 ** (decimals || 9);
 };
 
-const DERIVATION_PATH = {
-  deprecated: undefined,
-  bip44: 'bip44',
-  bip44Change: 'bip44Change',
-  cliWallet: 'cliWallet',
-  // bip44Root: 'bip44Root', // Ledger only.
-};
-const PATH = {
-  deprecated: (walletIndex, accountIndex) => {
-    return `m/501'/${walletIndex}'/0/${accountIndex}`;
-  },
-  bip44: (walletIndex, accountIndex) => {
-    return `m/44'/501'/${walletIndex}'`;
-  },
-  bip44Change: (walletIndex, accountIndex) => {
-    return `m/44'/501'/${walletIndex}'/0'`;
-  },
-  cliWallet: (walletIndex, accountIndex) => {
-    return 'undefined';
-  },
-  // bip44Root: 'bip44Root', // Ledger only.
-};
-
-const walletProvider = {
-  deprecated: 'SOLFLARE, Sollet.io',
-  bip44: 'Trust Wallet, SOLFLARE, Sollet.io',
-  bip44Change: 'SOLFLARE, Phantom Wallet, Sollet.io',
-  cliWallet: 'cliWallet',
-};
-
-function deriveSeed(seed, walletIndex, derivationPath, accountIndex) {
+const deriveSeed = (seed, walletIndex, derivationPath, accountIndex) => {
   switch (derivationPath) {
     case DERIVATION_PATH.deprecated: {
       const path = `m/501'/${walletIndex}'/0/${accountIndex}`;
@@ -69,11 +50,7 @@ function deriveSeed(seed, walletIndex, derivationPath, accountIndex) {
     default:
       throw new Error(`invalid derivation path: ${derivationPath}`);
   }
-}
-
-const TOKEN_PROGRAM_ID = new PublicKey(
-  'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
-);
+};
 
 function getAccountFromSeed(
   seed,
@@ -94,55 +71,6 @@ function getKeypairFromSeed(
   const derivedSeed = deriveSeed(seed, walletIndex, dPath, accountIndex);
   return Keypair.fromSeed(derivedSeed);
 }
-
-const ACCOUNT_LAYOUT = BufferLayout.struct([
-  BufferLayout.blob(32, 'mint'),
-  BufferLayout.blob(32, 'owner'),
-  BufferLayout.nu64('amount'),
-  BufferLayout.blob(93),
-]);
-
-const MINT_LAYOUT = BufferLayout.struct([
-  BufferLayout.blob(44),
-  BufferLayout.u8('decimals'),
-  BufferLayout.blob(37),
-]);
-
-const LAYOUT = BufferLayout.union(BufferLayout.u8('instruction'));
-LAYOUT.addVariant(
-  0,
-  BufferLayout.struct([
-    BufferLayout.u8('decimals'),
-    BufferLayout.blob(32, 'mintAuthority'),
-    BufferLayout.u8('freezeAuthorityOption'),
-    BufferLayout.blob(32, 'freezeAuthority'),
-  ]),
-  'initializeMint',
-);
-LAYOUT.addVariant(1, BufferLayout.struct([]), 'initializeAccount');
-LAYOUT.addVariant(
-  7,
-  BufferLayout.struct([BufferLayout.nu64('amount')]),
-  'mintTo',
-);
-LAYOUT.addVariant(
-  8,
-  BufferLayout.struct([BufferLayout.nu64('amount')]),
-  'burn',
-);
-LAYOUT.addVariant(9, BufferLayout.struct([]), 'closeAccount');
-LAYOUT.addVariant(
-  12,
-  BufferLayout.struct([
-    BufferLayout.nu64('amount'),
-    BufferLayout.u8('decimals'),
-  ]),
-  'transferChecked',
-);
-
-const instructionMaxSpan = Math.max(
-  ...Object.values(LAYOUT.registry).map((r) => r.span),
-);
 
 function encodeTokenInstructionData(instruction) {
   const b = Buffer.alloc(instructionMaxSpan);
@@ -172,14 +100,6 @@ const transferChecked = ({
     programId: TOKEN_PROGRAM_ID,
   });
 };
-
-const MEMO_PROGRAM_ID = new PublicKey(
-  'Memo1UhkJRfHyvLMcVucJwxXeuD728EqVDDwQDxFMNo',
-);
-
-const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey(
-  'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
-);
 
 const memoInstruction = (memo) => {
   return new TransactionInstruction({
@@ -285,32 +205,6 @@ const createAssociatedTokenAccountIx = async (
   return [ix, associatedTokenAddress];
 };
 
-const OWNER_VALIDATION_PROGRAM_ID = new PublicKey(
-  '4MNPdKu9wFMvEeZBMt3Eipfs5ovVWTJb31pEXDJAAxX5',
-);
-
-class PublicKeyLayout extends BufferLayout.Blob {
-  constructor(property) {
-    super(32, property);
-  }
-
-  decode(b, offset) {
-    return new PublicKey(super.decode(b, offset));
-  }
-
-  encode(src, b, offset) {
-    return super.encode(src.toBuffer(), b, offset);
-  }
-}
-
-function publicKeyLayout(property) {
-  return new PublicKeyLayout(property);
-}
-
-const OWNER_VALIDATION_LAYOUT = BufferLayout.struct([
-  publicKeyLayout('account'),
-]);
-
 function encodeOwnerValidationInstruction(instruction) {
   const b = Buffer.alloc(OWNER_VALIDATION_LAYOUT.span);
   const span = OWNER_VALIDATION_LAYOUT.encode(instruction, b);
@@ -352,7 +246,6 @@ const createTransferBetweenSplTokenAccountsInstruction = ({
 };
 
 const createAndTransferToAccount = async (
-  // connection,
   owner,
   sourcePublicKey,
   destinationPublicKey,
@@ -392,21 +285,13 @@ const createAndTransferToAccount = async (
 module.exports = {
   toSOL,
   fromSOL,
-  DERIVATION_PATH,
-  PATH,
   deriveSeed,
   getAccountFromSeed,
   getKeypairFromSeed,
-  TOKEN_PROGRAM_ID,
-  ACCOUNT_LAYOUT,
-  MINT_LAYOUT,
-  instructionMaxSpan,
   encodeTokenInstructionData,
   transferChecked,
   memoInstruction,
-  ASSOCIATED_TOKEN_PROGRAM_ID,
   createAndTransferToAccount,
   assertOwner,
   createAssociatedTokenAccountIx,
-  walletProvider,
 };

@@ -20,6 +20,10 @@ router.post(
 
 router.post('/unStake', mw.solanaNetwork, rayController.postUnStake);
 
-router.get('/stakeAccounts', mw.solanaNetwork, rayController.getStakeAccounts);
+router.get('/stakeAccount', mw.solanaNetwork, rayController.getStakeAccount);
+
+router.get('/searchPools', mw.solanaNetwork, rayController.getSearchPools);
+
+router.get('/poolInfo', mw.solanaNetwork, rayController.getPoolInfo);
 
 module.exports = router;
