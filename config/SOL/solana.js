@@ -14,8 +14,8 @@ const {
   instructionMaxSpan,
   OWNER_VALIDATION_LAYOUT,
   DERIVATION_PATH,
+  LAYOUT,
 } = require('./solanaStruct');
-const {LAYOUT} = require('./raydiumStruct');
 const {
   MEMO_PROGRAM_ID,
   ASSOCIATED_TOKEN_PROGRAM_ID,

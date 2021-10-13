@@ -20,19 +20,21 @@ const cwr = require('../utils/createWebResp');
 const {
   toSOL,
   fromSOL,
-  DERIVATION_PATH,
-  PATH,
   getAccountFromSeed,
   getKeypairFromSeed,
-  MINT_LAYOUT,
-  ACCOUNT_LAYOUT,
   encodeTokenInstructionData,
   transferChecked,
   memoInstruction,
   createAndTransferToAccount,
   createAssociatedTokenAccountIx,
-  walletProvider,
 } = require('../config/SOL/solana');
+const {
+  DERIVATION_PATH,
+  PATH,
+  walletProvider,
+  ACCOUNT_LAYOUT,
+  MINT_LAYOUT,
+} = require('../config/SOL/solanaStruct');
 
 const getBalance = async (req, res) => {
   try {

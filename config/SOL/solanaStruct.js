@@ -103,6 +103,7 @@ module.exports = {
   DERIVATION_PATH,
   PATH,
   ACCOUNT_LAYOUT,
+  LAYOUT,
   MINT_LAYOUT,
   instructionMaxSpan,
   walletProvider,

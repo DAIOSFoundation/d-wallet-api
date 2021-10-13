@@ -1,4 +1,3 @@
-const BufferLayout = require('buffer-layout');
 const {struct, blob} = require('buffer-layout');
 const {publicKey, u64, u128, u8} = require('@project-serum/borsh');
 const BigNumber = require('bignumber.js');
