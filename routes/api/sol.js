@@ -11,6 +11,12 @@ router.get('/block', mw.solanaNetwork, solController.getBlock);
 router.get('/transaction', mw.solanaNetwork, solController.getTransaction);
 
 router.get(
+  '/formedTransaction',
+  mw.solanaNetwork,
+  solController.getFormedTransaction,
+);
+
+router.get(
   '/accountDetail',
   mw.solanaNetwork,
   mw.solscanNetwork,

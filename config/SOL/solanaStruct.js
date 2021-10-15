@@ -99,6 +99,12 @@ const OWNER_VALIDATION_LAYOUT = BufferLayout.struct([
   publicKeyLayout('account'),
 ]);
 
+const InstructionData = {
+  'SOL Transfer': '3Bxs411Dtc7pkFQj',
+  'SPL Transfer': 'hNmtbNYibdzwf',
+  'Raydium Remove Liquidity': '3yx6XPfh1jdq',
+};
+
 module.exports = {
   DERIVATION_PATH,
   PATH,
@@ -109,4 +115,5 @@ module.exports = {
   walletProvider,
   PublicKeyLayout,
   OWNER_VALIDATION_LAYOUT,
+  InstructionData,
 };

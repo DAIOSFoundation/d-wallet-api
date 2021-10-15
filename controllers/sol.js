@@ -35,6 +35,7 @@ const {
   ACCOUNT_LAYOUT,
   MINT_LAYOUT,
 } = require('../config/SOL/solanaStruct');
+const {getBigNumber} = require('../config/SOL/raydium');
 
 const getBalance = async (req, res) => {
   try {
@@ -125,6 +126,100 @@ const getTransaction = async (req, res) => {
     return cwr.createWebResp(res, 200, {txNumber, tx});
   } catch (e) {
     return cwr.errorWebResp(res, 500, 'E0000 - getTransaction', e.message);
+  }
+};
+
+const getFormedTransaction = async (req, res) => {
+  try {
+    const {txNumber} = req.query;
+    const envEndpoint = {
+      devnet: splTokenRegistry.ENV.Devnet,
+      testnet: splTokenRegistry.ENV.Testnet,
+      'mainnet-beta': splTokenRegistry.ENV.MainnetBeta,
+    };
+    const slot = await req.connection.getSlot();
+    const tx = await req.connection.getTransaction(txNumber);
+    const fee = toSOL(tx.meta.fee);
+    const postBalances = tx.meta.postBalances.map((item) => toSOL(item));
+    const preBalances = tx.meta.preBalances.map((item) => toSOL(item));
+    const postTokenBalances = tx.meta.postTokenBalances.map(
+      ({accountIndex, mint, uiTokenAmount}) => ({
+        accountIndex,
+        mint,
+        amount: uiTokenAmount?.uiAmount === null ? 0 : uiTokenAmount?.uiAmount,
+      }),
+    );
+    const preTokenBalances = tx.meta.preTokenBalances.map(
+      ({accountIndex, mint, uiTokenAmount}) => ({
+        accountIndex,
+        mint,
+        amount: uiTokenAmount?.uiAmount === null ? 0 : uiTokenAmount?.uiAmount,
+      }),
+    );
+    const accounts = tx.transaction.message.accountKeys;
+    const blockConfirmation = slot - tx.slot;
+    const signatures =
+      tx.transaction.signatures[0] === txNumber
+        ? txNumber
+        : tx.transaction.signatures;
+    const solBalanceChange = {
+      accounts: accounts.map((item) => item.toString()),
+      balanceBefore: preBalances,
+      balanceAfter: postBalances,
+      change: postBalances.map(
+        (item) => item - preBalances[postBalances.indexOf(item)],
+      ),
+    };
+    const tokenBalanceChange = {
+      tokenInfo: [],
+      accounts: [],
+      ownerAccounts: [],
+      balanceBefore: [],
+      balanceAfter: [],
+      change: [],
+    };
+    const allTokenList =
+      await new splTokenRegistry.TokenListProvider().resolve();
+    accounts.forEach((account) => {
+      const index = accounts.indexOf(account);
+      const postTokenBalance = postTokenBalances.find(
+        ({accountIndex}) => accountIndex === index,
+      );
+      const preTokenBalance = preTokenBalances.find(
+        ({accountIndex}) => accountIndex === index,
+      );
+      if (postTokenBalance && preTokenBalance) {
+        const tokenListOnEndpoint = allTokenList.filterByChainId(
+          envEndpoint[req.network],
+        );
+        const tokenList = tokenListOnEndpoint.getList();
+        tokenBalanceChange.tokenInfo.push(
+          tokenList.find((token) => {
+            return token.address === postTokenBalance.mint;
+          }),
+        );
+        tokenBalanceChange.balanceAfter.push(postTokenBalance.amount);
+        tokenBalanceChange.balanceBefore.push(preTokenBalance.amount);
+        tokenBalanceChange.accounts.push(account.toString());
+        tokenBalanceChange.change.push(
+          postTokenBalance.amount - preTokenBalance.amount,
+        );
+      }
+    });
+    return cwr.createWebResp(res, 200, {
+      signatures,
+      fee,
+      blockConfirmation,
+      solBalanceChange,
+      tokenBalanceChange,
+    });
+  } catch (e) {
+    return cwr.errorWebResp(
+      res,
+      500,
+      'E0000 - getFormedTransaction',
+      e.message,
+    );
   }
 };
 
@@ -272,7 +367,7 @@ const postPrivateKeyToPublicKey = async (req, res) => {
 
 const postSend = async (req, res) => {
   try {
-    const {fromMnemonic, fromPrivateKey, toAddress, balance} = req.body;
+    const {fromMnemonic, fromPrivateKey, toAddress, balance, memo} = req.body;
     let from;
     if (fromMnemonic) {
       const seed = bip39.mnemonicToSeedSync(fromMnemonic);
@@ -296,6 +391,9 @@ const postSend = async (req, res) => {
         lamports: fromSOL(balance),
       }),
     );
+    if (memo) {
+      transaction.add(memoInstruction(memo));
+    }
     const signature = await sendAndConfirmTransaction(
       req.connection,
       transaction,
@@ -357,7 +455,7 @@ const postTokenSend = async (req, res) => {
       );
       const fromTokenInfo = await token.getAccountInfo(fromResult[0].publicKey);
       const fromTokenAmount =
-        fromTokenInfo.amount.toNumber() / 10 ** tokenInfo.decimals;
+        getBigNumber(fromTokenInfo.amount) / 10 ** tokenInfo.decimals;
       if (fromTokenAmount < balance) {
         return cwr.errorWebResp(
           res,
@@ -404,9 +502,6 @@ const postTokenSend = async (req, res) => {
             amount: amount * 10 ** tokenInfo.decimals,
           }),
         );
-        if (memo) {
-          transaction.add(memoInstruction(memo));
-        }
       } else if (toResult.length === 0) {
         transaction.add(
           await createAndTransferToAccount(
@@ -439,9 +534,9 @@ const postTokenSend = async (req, res) => {
           amount: amount * 10 ** tokenInfo.decimals,
         }),
       );
-      if (memo) {
-        transaction.add(memoInstruction(memo));
-      }
+    }
+    if (memo) {
+      transaction.add(memoInstruction(memo));
     }
     const signature = await sendAndConfirmTransaction(
       req.connection,
@@ -483,7 +578,7 @@ const getStakeInfo = async (req, res) => {
 
 const postStake = async (req, res) => {
   try {
-    const {fromMnemonic, fromPrivateKey, balance, votePubkey, stakeSecretKey} =
+    const {fromMnemonic, fromPrivateKey, balance, stakeSecretKey, memo} =
       req.body;
     let from;
     if (fromMnemonic) {
@@ -518,6 +613,9 @@ const postStake = async (req, res) => {
         lamports: fromSOL(balance),
       }),
     );
+    if (memo) {
+      transaction.add(memoInstruction(memo));
+    }
     const signature = await sendAndConfirmTransaction(
       req.connection,
       transaction,
@@ -537,7 +635,8 @@ const postStake = async (req, res) => {
 
 const postDelegate = async (req, res) => {
   try {
-    const {fromMnemonic, fromPrivateKey, votePubkey, stakePublicKey} = req.body;
+    const {fromMnemonic, fromPrivateKey, votePubkey, stakePublicKey, memo} =
+      req.body;
     let from;
     if (fromMnemonic) {
       const seed = bip39.mnemonicToSeedSync(fromMnemonic);
@@ -569,6 +668,9 @@ const postDelegate = async (req, res) => {
         votePubkey,
       }),
     );
+    if (memo) {
+      transaction.add(memoInstruction(memo));
+    }
     const signature = await sendAndConfirmTransaction(
       req.connection,
       transaction,
@@ -583,7 +685,7 @@ const postDelegate = async (req, res) => {
 
 const postDeactivate = async (req, res) => {
   try {
-    const {fromMnemonic, fromPrivateKey, stakePublicKey} = req.body;
+    const {fromMnemonic, fromPrivateKey, stakePublicKey, memo} = req.body;
     let from;
     if (fromMnemonic) {
       const seed = bip39.mnemonicToSeedSync(fromMnemonic);
@@ -614,6 +716,9 @@ const postDeactivate = async (req, res) => {
         stakePubkey: new PublicKey(stakePublicKey),
       }),
     );
+    if (memo) {
+      transaction.add(memoInstruction(memo));
+    }
     const signature = await sendAndConfirmTransaction(
       req.connection,
       transaction,
@@ -628,7 +733,8 @@ const postDeactivate = async (req, res) => {
 
 const postWithdraw = async (req, res) => {
   try {
-    const {fromMnemonic, fromPrivateKey, stakePublicKey, amount} = req.body;
+    const {fromMnemonic, fromPrivateKey, stakePublicKey, amount, memo} =
+      req.body;
     let from;
     if (fromMnemonic) {
       const seed = bip39.mnemonicToSeedSync(fromMnemonic);
@@ -662,6 +768,9 @@ const postWithdraw = async (req, res) => {
         toPubkey: from.publicKey,
       }),
     );
+    if (memo) {
+      transaction.add(memoInstruction(memo));
+    }
     const signature = await sendAndConfirmTransaction(
       req.connection,
       transaction,
@@ -682,6 +791,7 @@ const postMintToken = async (req, res) => {
       decimals,
       mintPrivateKey,
       initialAccountPrivateKey,
+      memo,
     } = req.body;
     const owner = Keypair.fromSecretKey(
       Uint8Array.from(ownerPrivateKey.split(',')),
@@ -778,12 +888,15 @@ const postMintToken = async (req, res) => {
           ],
           data: encodeTokenInstructionData({
             mintTo: {
-              amount,
+              amount: getBigNumber(amount),
             },
           }),
           programId: TOKEN_PROGRAM_ID,
         }),
       );
+    }
+    if (memo) {
+      transaction.add(memoInstruction(memo));
     }
     const signature = await sendAndConfirmTransaction(
       req.connection,
@@ -877,7 +990,7 @@ const getBlockConfirmation = async (req, res) => {
 
 const postCreateTokenAccount = async (req, res) => {
   try {
-    const {fromMnemonic, fromPrivateKey, mintPublicKey} = req.body;
+    const {fromMnemonic, fromPrivateKey, mintPublicKey, memo} = req.body;
     let from;
     if (fromMnemonic) {
       const seed = bip39.mnemonicToSeedSync(fromMnemonic);
@@ -902,6 +1015,9 @@ const postCreateTokenAccount = async (req, res) => {
     );
     transaction.add(ix);
     transaction.feePayer = from.publicKey;
+    if (memo) {
+      transaction.add(memoInstruction(memo));
+    }
     const signature = await sendAndConfirmTransaction(
       req.connection,
       transaction,
@@ -930,6 +1046,7 @@ module.exports = {
   getTokenBalance,
   getBlock,
   getTransaction,
+  getFormedTransaction,
   postDecodeMnemonic,
   getAccountDetail,
   getSolTransfer,
