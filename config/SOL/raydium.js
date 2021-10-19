@@ -1,8 +1,4 @@
-const {
-  Account,
-  PublicKey,
-  SystemProgram,
-} = require('@solana/web3.js');
+const {Account, PublicKey, SystemProgram} = require('@solana/web3.js');
 const {Token} = require('@solana/spl-token');
 const {
   initializeAccount,

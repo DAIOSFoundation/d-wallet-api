@@ -1,7 +1,4 @@
-const {
-  PublicKey,
-  Transaction,
-} = require('@solana/web3.js');
+const {PublicKey, Transaction} = require('@solana/web3.js');
 const {closeAccount} = require('@project-serum/serum/lib/token-instructions');
 const cwr = require('../utils/createWebResp');
 const {
