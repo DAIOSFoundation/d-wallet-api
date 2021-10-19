@@ -1,18 +1,23 @@
-const {struct, blob} = require('buffer-layout');
+const {struct, blob, nu64} = require('buffer-layout');
 const {publicKey, u64, u128, u8} = require('@project-serum/borsh');
 const BigNumber = require('bignumber.js');
+const {
+  SYSVAR_CLOCK_PUBKEY,
+  TransactionInstruction,
+} = require('@solana/web3.js');
 const {
   STAKE_PROGRAM_ID,
   STAKE_PROGRAM_ID_V4,
   STAKE_PROGRAM_ID_V5,
+  TOKEN_PROGRAM_ID,
 } = require('./ProgramIds');
 
-function lt(a, b) {
+const lt = (a, b) => {
   const valueA = new BigNumber(a);
   const valueB = new BigNumber(b);
 
   return valueA.isLessThan(valueB);
-}
+};
 
 class TokenAmount {
   constructor(wei, decimals, isWei = true) {
@@ -53,6 +58,21 @@ class TokenAmount {
   // ÷ dividedBy
 }
 
+const STAKE_INFO_LAYOUT = struct([
+  u64('state'),
+  u64('nonce'),
+  publicKey('poolLpTokenAccount'),
+  publicKey('poolRewardTokenAccount'),
+  publicKey('owner'),
+  publicKey('feeOwner'),
+  u64('feeY'),
+  u64('feeX'),
+  u64('totalReward'),
+  u128('rewardPerShareNet'),
+  u64('lastBlock'),
+  u64('rewardPerBlock'),
+]);
+
 const STAKE_INFO_LAYOUT_V4 = struct([
   u64('state'),
   u64('nonce'),
@@ -86,21 +106,6 @@ const USER_STAKE_INFO_ACCOUNT_LAYOUT_V4 = struct([
   u64('depositBalance'),
   u64('rewardDebt'),
   u64('rewardDebtB'),
-]);
-
-const STAKE_INFO_LAYOUT = struct([
-  u64('state'),
-  u64('nonce'),
-  publicKey('poolLpTokenAccount'),
-  publicKey('poolRewardTokenAccount'),
-  publicKey('owner'),
-  publicKey('feeOwner'),
-  u64('feeY'),
-  u64('feeX'),
-  u64('totalReward'),
-  u128('rewardPerShareNet'),
-  u64('lastBlock'),
-  u64('rewardPerBlock'),
 ]);
 
 const NATIVE_SOL = {
@@ -2320,6 +2325,365 @@ const FARMS = [
   },
 ].sort((a, b) => (a.fusion === true && b.fusion === false ? 1 : -1));
 
+const AMM_INFO_LAYOUT = struct([
+  u64('status'),
+  u64('nonce'),
+  u64('orderNum'),
+  u64('depth'),
+  u64('coinDecimals'),
+  u64('pcDecimals'),
+  u64('state'),
+  u64('resetFlag'),
+  u64('fee'),
+  u64('minSize'),
+  u64('volMaxCutRatio'),
+  u64('pnlRatio'),
+  u64('amountWaveRatio'),
+  u64('coinLotSize'),
+  u64('pcLotSize'),
+  u64('minPriceMultiplier'),
+  u64('maxPriceMultiplier'),
+  u64('needTakePnlCoin'),
+  u64('needTakePnlPc'),
+  u64('totalPnlX'),
+  u64('totalPnlY'),
+  u64('systemDecimalsValue'),
+  publicKey('poolCoinTokenAccount'),
+  publicKey('poolPcTokenAccount'),
+  publicKey('coinMintAddress'),
+  publicKey('pcMintAddress'),
+  publicKey('lpMintAddress'),
+  publicKey('ammOpenOrders'),
+  publicKey('serumMarket'),
+  publicKey('serumProgramId'),
+  publicKey('ammTargetOrders'),
+  publicKey('ammQuantities'),
+  publicKey('poolWithdrawQueue'),
+  publicKey('poolTempLpTokenAccount'),
+  publicKey('ammOwner'),
+  publicKey('pnlOwner'),
+]);
+
+const AMM_INFO_LAYOUT_V3 = struct([
+  u64('status'),
+  u64('nonce'),
+  u64('orderNum'),
+  u64('depth'),
+  u64('coinDecimals'),
+  u64('pcDecimals'),
+  u64('state'),
+  u64('resetFlag'),
+  u64('fee'),
+  u64('min_separate'),
+  u64('minSize'),
+  u64('volMaxCutRatio'),
+  u64('pnlRatio'),
+  u64('amountWaveRatio'),
+  u64('coinLotSize'),
+  u64('pcLotSize'),
+  u64('minPriceMultiplier'),
+  u64('maxPriceMultiplier'),
+  u64('needTakePnlCoin'),
+  u64('needTakePnlPc'),
+  u64('totalPnlX'),
+  u64('totalPnlY'),
+  u64('poolTotalDepositPc'),
+  u64('poolTotalDepositCoin'),
+  u64('systemDecimalsValue'),
+  publicKey('poolCoinTokenAccount'),
+  publicKey('poolPcTokenAccount'),
+  publicKey('coinMintAddress'),
+  publicKey('pcMintAddress'),
+  publicKey('lpMintAddress'),
+  publicKey('ammOpenOrders'),
+  publicKey('serumMarket'),
+  publicKey('serumProgramId'),
+  publicKey('ammTargetOrders'),
+  publicKey('ammQuantities'),
+  publicKey('poolWithdrawQueue'),
+  publicKey('poolTempLpTokenAccount'),
+  publicKey('ammOwner'),
+  publicKey('pnlOwner'),
+  publicKey('srmTokenAccount'),
+]);
+
+const AMM_INFO_LAYOUT_V4 = struct([
+  u64('status'),
+  u64('nonce'),
+  u64('orderNum'),
+  u64('depth'),
+  u64('coinDecimals'),
+  u64('pcDecimals'),
+  u64('state'),
+  u64('resetFlag'),
+  u64('minSize'),
+  u64('volMaxCutRatio'),
+  u64('amountWaveRatio'),
+  u64('coinLotSize'),
+  u64('pcLotSize'),
+  u64('minPriceMultiplier'),
+  u64('maxPriceMultiplier'),
+  u64('systemDecimalsValue'),
+  // Fees
+  u64('minSeparateNumerator'),
+  u64('minSeparateDenominator'),
+  u64('tradeFeeNumerator'),
+  u64('tradeFeeDenominator'),
+  u64('pnlNumerator'),
+  u64('pnlDenominator'),
+  u64('swapFeeNumerator'),
+  u64('swapFeeDenominator'),
+  // OutPutData
+  u64('needTakePnlCoin'),
+  u64('needTakePnlPc'),
+  u64('totalPnlPc'),
+  u64('totalPnlCoin'),
+  u128('poolTotalDepositPc'),
+  u128('poolTotalDepositCoin'),
+  u128('swapCoinInAmount'),
+  u128('swapPcOutAmount'),
+  u64('swapCoin2PcFee'),
+  u128('swapPcInAmount'),
+  u128('swapCoinOutAmount'),
+  u64('swapPc2CoinFee'),
+
+  publicKey('poolCoinTokenAccount'),
+  publicKey('poolPcTokenAccount'),
+  publicKey('coinMintAddress'),
+  publicKey('pcMintAddress'),
+  publicKey('lpMintAddress'),
+  publicKey('ammOpenOrders'),
+  publicKey('serumMarket'),
+  publicKey('serumProgramId'),
+  publicKey('ammTargetOrders'),
+  publicKey('poolWithdrawQueue'),
+  publicKey('poolTempLpTokenAccount'),
+  publicKey('ammOwner'),
+  publicKey('pnlOwner'),
+]);
+
+const depositInstruction = (
+  programId,
+  poolId,
+  poolAuthority,
+  userInfoAccount,
+  userOwner,
+  userLpTokenAccount,
+  poolLpTokenAccount,
+  userRewardTokenAccount,
+  poolRewardTokenAccount,
+  amount,
+) => {
+  const dataLayout = struct([u8('instruction'), nu64('amount')]);
+
+  const keys = [
+    {pubkey: poolId, isSigner: false, isWritable: true},
+    {pubkey: poolAuthority, isSigner: false, isWritable: false},
+    {pubkey: userInfoAccount, isSigner: false, isWritable: true},
+    {pubkey: userOwner, isSigner: true, isWritable: false},
+    {pubkey: userLpTokenAccount, isSigner: false, isWritable: true},
+    {pubkey: poolLpTokenAccount, isSigner: false, isWritable: true},
+    {pubkey: userRewardTokenAccount, isSigner: false, isWritable: true},
+    {pubkey: poolRewardTokenAccount, isSigner: false, isWritable: true},
+    {pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false},
+    {pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false},
+  ];
+
+  const data = Buffer.alloc(dataLayout.span);
+  dataLayout.encode(
+    {
+      instruction: 1,
+      amount,
+    },
+    data,
+  );
+
+  return new TransactionInstruction({
+    keys,
+    programId,
+    data,
+  });
+};
+
+const depositInstructionV4 = (
+  programId,
+  // staking pool
+  poolId,
+  poolAuthority,
+  // user
+  userInfoAccount,
+  userOwner,
+  userLpTokenAccount,
+  poolLpTokenAccount,
+  userRewardTokenAccount,
+  poolRewardTokenAccount,
+  userRewardTokenAccountB,
+  poolRewardTokenAccountB,
+  // tokenProgramId: PublicKey,
+  amount,
+) => {
+  const dataLayout = struct([u8('instruction'), nu64('amount')]);
+
+  const keys = [
+    {pubkey: poolId, isSigner: false, isWritable: true},
+    {pubkey: poolAuthority, isSigner: false, isWritable: false},
+    {pubkey: userInfoAccount, isSigner: false, isWritable: true},
+    {pubkey: userOwner, isSigner: true, isWritable: false},
+    {pubkey: userLpTokenAccount, isSigner: false, isWritable: true},
+    {pubkey: poolLpTokenAccount, isSigner: false, isWritable: true},
+    {pubkey: userRewardTokenAccount, isSigner: false, isWritable: true},
+    {pubkey: poolRewardTokenAccount, isSigner: false, isWritable: true},
+    {pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false},
+    {pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false},
+    {pubkey: userRewardTokenAccountB, isSigner: false, isWritable: true},
+    {pubkey: poolRewardTokenAccountB, isSigner: false, isWritable: true},
+  ];
+
+  const data = Buffer.alloc(dataLayout.span);
+  dataLayout.encode(
+    {
+      instruction: 1,
+      amount,
+    },
+    data,
+  );
+
+  return new TransactionInstruction({
+    keys,
+    programId,
+    data,
+  });
+};
+
+const withdrawInstruction = (
+  programId,
+  poolId,
+  poolAuthority,
+  userInfoAccount,
+  userOwner,
+  userLpTokenAccount,
+  poolLpTokenAccount,
+  userRewardTokenAccount,
+  poolRewardTokenAccount,
+  amount,
+) => {
+  const dataLayout = struct([u8('instruction'), nu64('amount')]);
+
+  const keys = [
+    {pubkey: poolId, isSigner: false, isWritable: true},
+    {pubkey: poolAuthority, isSigner: false, isWritable: false},
+    {pubkey: userInfoAccount, isSigner: false, isWritable: true},
+    {pubkey: userOwner, isSigner: true, isWritable: false},
+    {pubkey: userLpTokenAccount, isSigner: false, isWritable: true},
+    {pubkey: poolLpTokenAccount, isSigner: false, isWritable: true},
+    {pubkey: userRewardTokenAccount, isSigner: false, isWritable: true},
+    {pubkey: poolRewardTokenAccount, isSigner: false, isWritable: true},
+    {pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false},
+    {pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false},
+  ];
+
+  const data = Buffer.alloc(dataLayout.span);
+  dataLayout.encode(
+    {
+      instruction: 2,
+      amount,
+    },
+    data,
+  );
+
+  return new TransactionInstruction({
+    keys,
+    programId,
+    data,
+  });
+};
+
+const withdrawInstructionV4 = (
+  programId,
+  // staking pool
+  poolId,
+  poolAuthority,
+  // user
+  userInfoAccount,
+  userOwner,
+  userLpTokenAccount,
+  poolLpTokenAccount,
+  userRewardTokenAccount,
+  poolRewardTokenAccount,
+  userRewardTokenAccountB,
+  poolRewardTokenAccountB,
+  // tokenProgramId: PublicKey,
+  amount,
+) => {
+  const dataLayout = struct([u8('instruction'), nu64('amount')]);
+
+  const keys = [
+    {pubkey: poolId, isSigner: false, isWritable: true},
+    {pubkey: poolAuthority, isSigner: false, isWritable: false},
+    {pubkey: userInfoAccount, isSigner: false, isWritable: true},
+    {pubkey: userOwner, isSigner: true, isWritable: false},
+    {pubkey: userLpTokenAccount, isSigner: false, isWritable: true},
+    {pubkey: poolLpTokenAccount, isSigner: false, isWritable: true},
+    {pubkey: userRewardTokenAccount, isSigner: false, isWritable: true},
+    {pubkey: poolRewardTokenAccount, isSigner: false, isWritable: true},
+    {pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false},
+    {pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false},
+    {pubkey: userRewardTokenAccountB, isSigner: false, isWritable: true},
+    {pubkey: poolRewardTokenAccountB, isSigner: false, isWritable: true},
+  ];
+
+  const data = Buffer.alloc(dataLayout.span);
+  dataLayout.encode(
+    {
+      instruction: 2,
+      amount,
+    },
+    data,
+  );
+
+  return new TransactionInstruction({
+    keys,
+    programId,
+    data,
+  });
+};
+
+const emergencyWithdrawInstructionV4 = (
+  programId,
+  poolId,
+  poolAuthority,
+  userInfoAccount,
+  userOwner,
+  userLpTokenAccount,
+  poolLpTokenAccount,
+) => {
+  const dataLayout = struct([u8('instruction')]);
+
+  const keys = [
+    {pubkey: poolId, isSigner: false, isWritable: true},
+    {pubkey: poolAuthority, isSigner: false, isWritable: false},
+    {pubkey: userInfoAccount, isSigner: false, isWritable: true},
+    {pubkey: userOwner, isSigner: true, isWritable: false},
+    {pubkey: userLpTokenAccount, isSigner: false, isWritable: true},
+    {pubkey: poolLpTokenAccount, isSigner: false, isWritable: true},
+    {pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false},
+  ];
+
+  const data = Buffer.alloc(dataLayout.span);
+  dataLayout.encode(
+    {
+      instruction: 7,
+    },
+    data,
+  );
+
+  return new TransactionInstruction({
+    keys,
+    programId,
+    data,
+  });
+};
+
 module.exports = {
   STAKE_INFO_LAYOUT,
   USER_STAKE_INFO_ACCOUNT_LAYOUT,
@@ -2334,4 +2698,12 @@ module.exports = {
   FARMS,
   lt,
   TokenAmount,
+  AMM_INFO_LAYOUT,
+  AMM_INFO_LAYOUT_V3,
+  AMM_INFO_LAYOUT_V4,
+  depositInstruction,
+  depositInstructionV4,
+  withdrawInstruction,
+  withdrawInstructionV4,
+  emergencyWithdrawInstructionV4,
 };

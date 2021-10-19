@@ -249,8 +249,12 @@ const solanaNetwork = async (req, res, next) => {
       );
     }
     req.web3 = solanaWeb3;
-    req.endpoint = req.web3.clusterApiUrl(req.network);
-    req.connection = new req.web3.Connection(req.endpoint /* , 'confirmed' */);
+    if (req.network === 'localhost') {
+      req.endpoint = 'http://127.0.0.1:8899';
+    } else {
+      req.endpoint = req.web3.clusterApiUrl(req.network);
+    }
+    req.connection = new req.web3.Connection(req.endpoint);
     next();
   } catch (e) {
     return cwr.errorWebResp(res, 500, `E0000 - solanaNetwork`, e.message);

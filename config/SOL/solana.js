@@ -6,6 +6,7 @@ const {
   Transaction,
   SystemProgram,
   SYSVAR_RENT_PUBKEY,
+  sendAndConfirmTransaction,
 } = require('@solana/web3.js');
 const bip32 = require('bip32');
 const {derivePath} = require('ed25519-hd-key');
@@ -30,6 +31,10 @@ const fromSOL = (value, decimals) => {
   return value * 10 ** (decimals || 9);
 };
 
+const getUnixTs = () => {
+  return new Date().getTime();
+};
+
 const deriveSeed = (seed, walletIndex, derivationPath, accountIndex) => {
   switch (derivationPath) {
     case DERIVATION_PATH.deprecated: {
@@ -52,31 +57,31 @@ const deriveSeed = (seed, walletIndex, derivationPath, accountIndex) => {
   }
 };
 
-function getAccountFromSeed(
+const getAccountFromSeed = (
   seed,
   walletIndex,
   dPath = undefined,
   accountIndex = 0,
-) {
+) => {
   const derivedSeed = deriveSeed(seed, walletIndex, dPath, accountIndex);
   return new Account(Keypair.fromSeed(derivedSeed).secretKey);
-}
+};
 
-function getKeypairFromSeed(
+const getKeypairFromSeed = (
   seed,
   walletIndex,
   dPath = undefined,
   accountIndex = 0,
-) {
+) => {
   const derivedSeed = deriveSeed(seed, walletIndex, dPath, accountIndex);
   return Keypair.fromSeed(derivedSeed);
-}
+};
 
-function encodeTokenInstructionData(instruction) {
+const encodeTokenInstructionData = (instruction) => {
   const b = Buffer.alloc(instructionMaxSpan);
   const span = LAYOUT.encode(instruction, b);
   return b.slice(0, span);
-}
+};
 
 const transferChecked = ({
   source,
@@ -116,6 +121,7 @@ const signAndSendTransaction = async (
   signers,
   skipPreflight = false,
 ) => {
+  // eslint-disable-next-line no-param-reassign
   transaction.recentBlockhash = (
     await connection.getRecentBlockhash('max')
   ).blockhash;
@@ -129,6 +135,7 @@ const signAndSendTransaction = async (
     transaction.partialSign(...signers);
   }
 
+  // eslint-disable-next-line no-param-reassign
   transaction = await wallet.signTransaction(transaction);
   const rawTransaction = transaction.serialize();
   return await connection.sendRawTransaction(rawTransaction, {
@@ -205,20 +212,20 @@ const createAssociatedTokenAccountIx = async (
   return [ix, associatedTokenAddress];
 };
 
-function encodeOwnerValidationInstruction(instruction) {
+const encodeOwnerValidationInstruction = (instruction) => {
   const b = Buffer.alloc(OWNER_VALIDATION_LAYOUT.span);
   const span = OWNER_VALIDATION_LAYOUT.encode(instruction, b);
   return b.slice(0, span);
-}
+};
 
-function assertOwner({account, owner}) {
+const assertOwner = ({account, owner}) => {
   const keys = [{pubkey: account, isSigner: false, isWritable: false}];
   return new TransactionInstruction({
     keys,
     data: encodeOwnerValidationInstruction({account: owner}),
     programId: OWNER_VALIDATION_PROGRAM_ID,
   });
-}
+};
 
 const createTransferBetweenSplTokenAccountsInstruction = ({
   ownerPublicKey,
@@ -282,9 +289,24 @@ const createAndTransferToAccount = async (
   return transaction;
 };
 
+const restoreWallet = (privateKey) => {
+  return Keypair.fromSecretKey(Uint8Array.from(privateKey.split(',')));
+};
+
+const sendAndGetTransaction = async (connection, transaction, signers) => {
+  const signature = await sendAndConfirmTransaction(
+    connection,
+    transaction,
+    signers,
+  );
+  const tx = await connection.getTransaction(signature);
+  return {signature, tx};
+};
+
 module.exports = {
   toSOL,
   fromSOL,
+  getUnixTs,
   deriveSeed,
   getAccountFromSeed,
   getKeypairFromSeed,
@@ -294,4 +316,6 @@ module.exports = {
   createAndTransferToAccount,
   assertOwner,
   createAssociatedTokenAccountIx,
+  restoreWallet,
+  sendAndGetTransaction,
 };

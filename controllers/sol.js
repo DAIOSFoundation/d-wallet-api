@@ -11,7 +11,6 @@ const {
   Transaction,
   TransactionInstruction,
   Authorized,
-  sendAndConfirmTransaction,
 } = require('@solana/web3.js');
 const bip39 = require('bip39');
 const splTokenRegistry = require('@solana/spl-token-registry');
@@ -27,6 +26,8 @@ const {
   memoInstruction,
   createAndTransferToAccount,
   createAssociatedTokenAccountIx,
+  restoreWallet,
+  sendAndGetTransaction,
 } = require('../config/SOL/solana');
 const {
   DERIVATION_PATH,
@@ -34,6 +35,7 @@ const {
   walletProvider,
   ACCOUNT_LAYOUT,
   MINT_LAYOUT,
+  getTokenAddressByAccount,
 } = require('../config/SOL/solanaStruct');
 const {getBigNumber} = require('../config/SOL/raydium');
 
@@ -51,24 +53,10 @@ const getBalance = async (req, res) => {
 const getTokenBalance = async (req, res) => {
   try {
     const {address, mint} = req.query;
-    const addressPublicKey = new PublicKey(address);
-    const filter = mint
-      ? {mint: new PublicKey(mint)}
-      : {programId: TOKEN_PROGRAM_ID};
-    const resp = await req.connection.getParsedTokenAccountsByOwner(
-      addressPublicKey,
-      filter,
-    );
-    const result = resp.value.map(
-      ({pubkey, account: {data, executable, owner, lamports}}) => ({
-        publicKey: new PublicKey(pubkey),
-        accountInfo: {
-          data,
-          executable,
-          owner: new PublicKey(owner),
-          lamports,
-        },
-      }),
+    const result = await getTokenAddressByAccount(
+      req.connection,
+      address,
+      mint,
     );
     let tokens = [];
     const envEndpoint = {
@@ -361,28 +349,19 @@ const postPrivateKeyToPublicKey = async (req, res) => {
     };
     return cwr.createWebResp(res, 200, {account});
   } catch (e) {
-    return cwr.errorWebResp(res, 500, `E0000 - postPrivTopubKey`, e.message);
+    return cwr.errorWebResp(
+      res,
+      500,
+      `E0000 - postPrivateKeyToPublicKey`,
+      e.message,
+    );
   }
 };
 
 const postSend = async (req, res) => {
   try {
-    const {fromMnemonic, fromPrivateKey, toAddress, balance, memo} = req.body;
-    let from;
-    if (fromMnemonic) {
-      const seed = bip39.mnemonicToSeedSync(fromMnemonic);
-      from = Keypair.fromSeed(seed.slice(0, 32));
-    } else if (fromPrivateKey) {
-      const privKey = Uint8Array.from(fromPrivateKey.split(','));
-      from = Keypair.fromSecretKey(privKey);
-    } else {
-      return cwr.errorWebResp(
-        res,
-        500,
-        `E0000 - postSendSol`,
-        'input one of fromMnemonic or fromPrivateKey',
-      );
-    }
+    const {privateKey, toAddress, balance, memo} = req.body;
+    const from = restoreWallet(privateKey);
     const to = new PublicKey(toAddress);
     const transaction = new Transaction().add(
       SystemProgram.transfer({
@@ -394,12 +373,11 @@ const postSend = async (req, res) => {
     if (memo) {
       transaction.add(memoInstruction(memo));
     }
-    const signature = await sendAndConfirmTransaction(
+    const {signature, tx} = await sendAndGetTransaction(
       req.connection,
       transaction,
       [from],
     );
-    const tx = await req.connection.getTransaction(signature);
     return cwr.createWebResp(res, 200, {signature, tx});
   } catch (e) {
     return cwr.errorWebResp(res, 500, `E0000 - postSendSol`, e.message);
@@ -408,24 +386,8 @@ const postSend = async (req, res) => {
 
 const postTokenSend = async (req, res) => {
   try {
-    const {fromPrivateKey, fromMnemonic, toAddress, amount, memo, mintAddress} =
-      req.body;
-
-    let from;
-    if (fromMnemonic) {
-      const seed = bip39.mnemonicToSeedSync(fromMnemonic);
-      from = Keypair.fromSeed(seed.slice(0, 32));
-    } else if (fromPrivateKey) {
-      const privKey = Uint8Array.from(fromPrivateKey.split(','));
-      from = Keypair.fromSecretKey(privKey);
-    } else {
-      return cwr.errorWebResp(
-        res,
-        500,
-        `E0000 - postSendSol`,
-        'input one of fromMnemonic or fromPrivateKey',
-      );
-    }
+    const {privateKey, toAddress, amount, memo, mintAddress} = req.body;
+    const from = restoreWallet(privateKey);
     const to = new PublicKey(toAddress);
     const mint = new PublicKey(mintAddress);
     const token = new Token(req.connection, mint, TOKEN_PROGRAM_ID, [from]);
@@ -438,20 +400,10 @@ const postTokenSend = async (req, res) => {
     const transaction = new Transaction();
 
     if (fromInfo.owner !== TOKEN_PROGRAM_ID) {
-      const fromResp = await req.connection.getParsedTokenAccountsByOwner(
-        from.publicKey,
-        {mint},
-      );
-      const fromResult = fromResp.value.map(
-        ({pubkey, account: {data, executable, owner, lamports}}) => ({
-          publicKey: new PublicKey(pubkey),
-          accountInfo: {
-            data,
-            executable,
-            owner: new PublicKey(owner),
-            lamports,
-          },
-        }),
+      const fromResult = await getTokenAddressByAccount(
+        req.connection,
+        from,
+        mint,
       );
       const fromTokenInfo = await token.getAccountInfo(fromResult[0].publicKey);
       const fromTokenAmount =
@@ -476,20 +428,7 @@ const postTokenSend = async (req, res) => {
     }
 
     if (toInfo.owner !== TOKEN_PROGRAM_ID) {
-      const toResp = await req.connection.getParsedTokenAccountsByOwner(to, {
-        mint,
-      });
-      const toResult = toResp.value.map(
-        ({pubkey, account: {data, executable, owner, lamports}}) => ({
-          publicKey: new PublicKey(pubkey),
-          accountInfo: {
-            data,
-            executable,
-            owner: new PublicKey(owner),
-            lamports,
-          },
-        }),
-      );
+      const toResult = await getTokenAddressByAccount(req.connection, to, mint);
       if (toResult.length === 1) {
         toToken = toResult[0].publicKey;
         transaction.add(
@@ -538,12 +477,11 @@ const postTokenSend = async (req, res) => {
     if (memo) {
       transaction.add(memoInstruction(memo));
     }
-    const signature = await sendAndConfirmTransaction(
+    const {signature, tx} = await sendAndGetTransaction(
       req.connection,
       transaction,
       [from],
     );
-    const tx = await req.connection.getTransaction(signature);
     return cwr.createWebResp(res, 200, {signature, tx});
   } catch (e) {
     return cwr.errorWebResp(res, 500, `E0000 - postTokenSend`, e.message);
@@ -578,23 +516,8 @@ const getStakeInfo = async (req, res) => {
 
 const postStake = async (req, res) => {
   try {
-    const {fromMnemonic, fromPrivateKey, balance, stakeSecretKey, memo} =
-      req.body;
-    let from;
-    if (fromMnemonic) {
-      const seed = bip39.mnemonicToSeedSync(fromMnemonic);
-      from = Keypair.fromSeed(seed.slice(0, 32));
-    } else if (fromPrivateKey) {
-      const privKey = Uint8Array.from(fromPrivateKey.split(','));
-      from = Keypair.fromSecretKey(privKey);
-    } else {
-      return cwr.errorWebResp(
-        res,
-        500,
-        `E0000 - postSendSol`,
-        'input one of fromMnemonic or fromPrivateKey',
-      );
-    }
+    const {privateKey, balance, stakeSecretKey, memo} = req.body;
+    const from = restoreWallet(privateKey);
     let stakeAccount;
     if (stakeSecretKey) {
       stakeAccount = Keypair.fromSecretKey(
@@ -616,12 +539,11 @@ const postStake = async (req, res) => {
     if (memo) {
       transaction.add(memoInstruction(memo));
     }
-    const signature = await sendAndConfirmTransaction(
+    const {signature, tx} = await sendAndGetTransaction(
       req.connection,
       transaction,
       [from, stakeAccount],
     );
-    const tx = await req.connection.getTransaction(signature);
     const stakeAccountInfo = {
       publicKey: stakeAccount.publicKey.toString(),
       secretKey: stakeAccount.secretKey.toString(),
@@ -635,28 +557,13 @@ const postStake = async (req, res) => {
 
 const postDelegate = async (req, res) => {
   try {
-    const {fromMnemonic, fromPrivateKey, votePubkey, stakePublicKey, memo} =
-      req.body;
-    let from;
-    if (fromMnemonic) {
-      const seed = bip39.mnemonicToSeedSync(fromMnemonic);
-      from = Keypair.fromSeed(seed.slice(0, 32));
-    } else if (fromPrivateKey) {
-      const privKey = Uint8Array.from(fromPrivateKey.split(','));
-      from = Keypair.fromSecretKey(privKey);
-    } else {
-      return cwr.errorWebResp(
-        res,
-        500,
-        `E0000 - postSendSol`,
-        'input one of fromMnemonic or fromPrivateKey',
-      );
-    }
+    const {privateKey, votePubkey, stakePublicKey, memo} = req.body;
+    const from = restoreWallet(privateKey);
     if (!stakePublicKey) {
       return cwr.errorWebResp(
         res,
         500,
-        `E0000 - postSendSol`,
+        `E0000 - postDelegate`,
         'input stakePublicKey',
       );
     }
@@ -671,12 +578,11 @@ const postDelegate = async (req, res) => {
     if (memo) {
       transaction.add(memoInstruction(memo));
     }
-    const signature = await sendAndConfirmTransaction(
+    const {signature, tx} = await sendAndGetTransaction(
       req.connection,
       transaction,
       [from],
     );
-    const tx = await req.connection.getTransaction(signature);
     return cwr.createWebResp(res, 200, {signature, tx});
   } catch (e) {
     return cwr.errorWebResp(res, 500, `E0000 - postDelegate`, e.message);
@@ -685,27 +591,13 @@ const postDelegate = async (req, res) => {
 
 const postDeactivate = async (req, res) => {
   try {
-    const {fromMnemonic, fromPrivateKey, stakePublicKey, memo} = req.body;
-    let from;
-    if (fromMnemonic) {
-      const seed = bip39.mnemonicToSeedSync(fromMnemonic);
-      from = Keypair.fromSeed(seed.slice(0, 32));
-    } else if (fromPrivateKey) {
-      const privKey = Uint8Array.from(fromPrivateKey.split(','));
-      from = Keypair.fromSecretKey(privKey);
-    } else {
-      return cwr.errorWebResp(
-        res,
-        500,
-        `E0000 - postSendSol`,
-        'input one of fromMnemonic or fromPrivateKey',
-      );
-    }
+    const {privateKey, stakePublicKey, memo} = req.body;
+    const from = restoreWallet(privateKey);
     if (!stakePublicKey) {
       return cwr.errorWebResp(
         res,
         500,
-        `E0000 - postSendSol`,
+        `E0000 - postDeactivate`,
         'input stakePublicKey',
       );
     }
@@ -719,12 +611,11 @@ const postDeactivate = async (req, res) => {
     if (memo) {
       transaction.add(memoInstruction(memo));
     }
-    const signature = await sendAndConfirmTransaction(
+    const {signature, tx} = await sendAndGetTransaction(
       req.connection,
       transaction,
       [from],
     );
-    const tx = await req.connection.getTransaction(signature);
     return cwr.createWebResp(res, 200, {signature, tx});
   } catch (e) {
     return cwr.errorWebResp(res, 500, `E0000 - postDeactivate`, e.message);
@@ -733,28 +624,13 @@ const postDeactivate = async (req, res) => {
 
 const postWithdraw = async (req, res) => {
   try {
-    const {fromMnemonic, fromPrivateKey, stakePublicKey, amount, memo} =
-      req.body;
-    let from;
-    if (fromMnemonic) {
-      const seed = bip39.mnemonicToSeedSync(fromMnemonic);
-      from = Keypair.fromSeed(seed.slice(0, 32));
-    } else if (fromPrivateKey) {
-      const privKey = Uint8Array.from(fromPrivateKey.split(','));
-      from = Keypair.fromSecretKey(privKey);
-    } else {
-      return cwr.errorWebResp(
-        res,
-        500,
-        `E0000 - postSendSol`,
-        'input one of fromMnemonic or fromPrivateKey',
-      );
-    }
+    const {privateKey, stakePublicKey, amount, memo} = req.body;
+    const from = restoreWallet(privateKey);
     if (!stakePublicKey) {
       return cwr.errorWebResp(
         res,
         500,
-        `E0000 - postSendSol`,
+        `E0000 - postWithdraw`,
         'input stakePublicKey',
       );
     }
@@ -771,12 +647,11 @@ const postWithdraw = async (req, res) => {
     if (memo) {
       transaction.add(memoInstruction(memo));
     }
-    const signature = await sendAndConfirmTransaction(
+    const {signature, tx} = await sendAndGetTransaction(
       req.connection,
       transaction,
       [from],
     );
-    const tx = await req.connection.getTransaction(signature);
     return cwr.createWebResp(res, 200, {signature, tx});
   } catch (e) {
     return cwr.errorWebResp(res, 500, `E0000 - postWithdraw`, e.message);
@@ -898,14 +773,12 @@ const postMintToken = async (req, res) => {
     if (memo) {
       transaction.add(memoInstruction(memo));
     }
-    const signature = await sendAndConfirmTransaction(
+    const {signature, tx} = await sendAndGetTransaction(
       req.connection,
       transaction,
       [owner, mint, initialAccount],
     );
-    const tx = await req.connection.getTransaction(signature);
-
-    return cwr.createWebResp(res, 200, {
+    const data = {
       signature,
       owner: {
         publicKey: owner.publicKey.toString(),
@@ -922,7 +795,9 @@ const postMintToken = async (req, res) => {
         secretKey: initialAccount._keypair.secretKey.toString(),
       },
       tx,
-    });
+    };
+    console.log(data);
+    return cwr.createWebResp(res, 200, data);
   } catch (e) {
     return cwr.errorWebResp(res, 500, `E0000 - postMintToken`, e.message);
   }
@@ -958,7 +833,7 @@ const getTokenInfo = async (req, res) => {
       tokenList: !tokenAddress ? tokenList : undefined,
     });
   } catch (e) {
-    return cwr.errorWebResp(res, 500, `E0000 - postTest`, e.message);
+    return cwr.errorWebResp(res, 500, `E0000 - getTokenInfo`, e.message);
   }
 };
 
@@ -990,22 +865,8 @@ const getBlockConfirmation = async (req, res) => {
 
 const postCreateTokenAccount = async (req, res) => {
   try {
-    const {fromMnemonic, fromPrivateKey, mintPublicKey, memo} = req.body;
-    let from;
-    if (fromMnemonic) {
-      const seed = bip39.mnemonicToSeedSync(fromMnemonic);
-      from = Keypair.fromSeed(seed.slice(0, 32));
-    } else if (fromPrivateKey) {
-      const privKey = Uint8Array.from(fromPrivateKey.split(','));
-      from = Keypair.fromSecretKey(privKey);
-    } else {
-      return cwr.errorWebResp(
-        res,
-        500,
-        `E0000 - postSendSol`,
-        'input one of fromMnemonic or fromPrivateKey',
-      );
-    }
+    const {privateKey, mintPublicKey, memo} = req.body;
+    const from = restoreWallet(privateKey);
     const transaction = new Transaction();
     const mint = new PublicKey(mintPublicKey);
     const [ix, address] = await createAssociatedTokenAccountIx(
@@ -1018,13 +879,11 @@ const postCreateTokenAccount = async (req, res) => {
     if (memo) {
       transaction.add(memoInstruction(memo));
     }
-    const signature = await sendAndConfirmTransaction(
+    const {signature, tx} = await sendAndGetTransaction(
       req.connection,
       transaction,
       [from],
     );
-    const tx = await req.connection.getTransaction(signature);
-
     return cwr.createWebResp(res, 200, {
       signature,
       address,

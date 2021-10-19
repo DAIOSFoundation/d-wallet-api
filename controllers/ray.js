@@ -1,8 +1,6 @@
 const {
-  Keypair,
   PublicKey,
   Transaction,
-  sendAndConfirmTransaction,
 } = require('@solana/web3.js');
 const {closeAccount} = require('@project-serum/serum/lib/token-instructions');
 const cwr = require('../utils/createWebResp');
@@ -14,6 +12,8 @@ const {
   getInfoAccount,
   getMultipleAccounts,
   getBigNumber,
+  createTokenAccountIfNotExist,
+  updateRaydiumPoolInfos,
 } = require('../config/SOL/raydium');
 const {
   USER_STAKE_INFO_ACCOUNT_LAYOUT,
@@ -23,34 +23,35 @@ const {
   TOKENS,
   NATIVE_SOL,
   TokenAmount,
+  depositV4,
+  deposit,
 } = require('../config/SOL/raydiumStruct');
-const {LIQUIDITY_POOLS} = require('../config/SOL/raydiumPools');
+const {
+  LIQUIDITY_POOLS,
+  addLiquidityInstructionV4,
+  getPrice,
+  removeLiquidityInstructionV4,
+  removeLiquidityInstruction,
+} = require('../config/SOL/raydiumPools');
 const addLiquidityInstruction = require('../config/SOL/raydiumPools');
+const {getTokenAddressByAccount} = require('../config/SOL/solanaStruct');
+const {
+  getUnixTs,
+  restoreWallet,
+  sendAndGetTransaction,
+} = require('../config/SOL/solana');
 
 const postStake = async (req, res) => {
   try {
     const {walletPrivateKey, amount, toStakeAccount} = req.body;
-    const wallet = Keypair.fromSecretKey(
-      Uint8Array.from(walletPrivateKey.split(',')),
-    );
+    const wallet = restoreWallet(walletPrivateKey);
     const farmInfo = FARMS.find((farm) => {
       return farm.name === 'RAY';
     });
-    const filter = {mint: new PublicKey(farmInfo.lp.mintAddress)};
-    const resp = await req.connection.getParsedTokenAccountsByOwner(
+    const result = await getTokenAddressByAccount(
+      req.connection,
       wallet.publicKey,
-      filter,
-    );
-    const result = resp.value.map(
-      ({pubkey, account: {data, executable, owner, lamports}}) => ({
-        publicKey: new PublicKey(pubkey),
-        accountInfo: {
-          data,
-          executable,
-          owner: new PublicKey(owner),
-          lamports,
-        },
-      }),
+      new PublicKey(farmInfo.lp.mintAddress),
     );
     let infoAccount;
     if (!toStakeAccount) {
@@ -61,7 +62,7 @@ const postStake = async (req, res) => {
         });
         if (!infoAccount) {
           const message = `RAY 스테이킹 계좌를 찾을 수 없습니다. 관리자에게 문의하세요....`;
-          return cwr.errorWebResp(res, 500, `E0000 - postUnstake`, message);
+          return cwr.errorWebResp(res, 500, `E0000 - postStake`, message);
         }
       }
     } else {
@@ -113,12 +114,11 @@ const postStake = async (req, res) => {
         amount * 10 ** farmInfo.lp.decimals,
       ),
     );
-    const signature = await sendAndConfirmTransaction(
+    const {signature, tx} = await sendAndGetTransaction(
       req.connection,
       transaction,
       signers,
     );
-    const tx = await req.connection.getTransaction(signature);
     return cwr.createWebResp(res, 200, {
       signature,
       tx,
@@ -132,27 +132,14 @@ const postHarvest = async (req, res) => {
   try {
     const {walletPrivateKey, toStakeAccount} = req.body;
     const amount = 0;
-    const wallet = Keypair.fromSecretKey(
-      Uint8Array.from(walletPrivateKey.split(',')),
-    );
+    const wallet = restoreWallet(walletPrivateKey);
     const farmInfo = FARMS.find((farm) => {
       return farm.name === 'RAY';
     });
-    const filter = {mint: new PublicKey(farmInfo.lp.mintAddress)};
-    const resp = await req.connection.getParsedTokenAccountsByOwner(
+    const result = await getTokenAddressByAccount(
+      req.connection,
       wallet.publicKey,
-      filter,
-    );
-    const result = resp.value.map(
-      ({pubkey, account: {data, executable, owner, lamports}}) => ({
-        publicKey: new PublicKey(pubkey),
-        accountInfo: {
-          data,
-          executable,
-          owner: new PublicKey(owner),
-          lamports,
-        },
-      }),
+      new PublicKey(farmInfo.lp.mintAddress),
     );
     let infoAccount;
     if (!toStakeAccount) {
@@ -162,7 +149,7 @@ const postHarvest = async (req, res) => {
       });
       if (!infoAccount) {
         const message = `RAY 스테이킹 계좌를 찾을 수 없습니다. 관리자에게 문의하세요....`;
-        return cwr.errorWebResp(res, 500, `E0000 - postUnstake`, message);
+        return cwr.errorWebResp(res, 500, `E0000 - postHarvest`, message);
       }
     } else {
       infoAccount = {publicKey: new PublicKey(toStakeAccount)};
@@ -213,12 +200,11 @@ const postHarvest = async (req, res) => {
         amount,
       ),
     );
-    const signature = await sendAndConfirmTransaction(
+    const {signature, tx} = await sendAndGetTransaction(
       req.connection,
       transaction,
       signers,
     );
-    const tx = await req.connection.getTransaction(signature);
     return cwr.createWebResp(res, 200, {
       signature,
       tx,
@@ -231,27 +217,14 @@ const postHarvest = async (req, res) => {
 const postUnStake = async (req, res) => {
   try {
     const {walletPrivateKey, amount, fromStakeAccount} = req.body;
-    const wallet = Keypair.fromSecretKey(
-      Uint8Array.from(walletPrivateKey.split(',')),
-    );
+    const wallet = restoreWallet(walletPrivateKey);
     const farmInfo = FARMS.find((farm) => {
       return farm.name === 'RAY';
     });
-    const filter = {mint: new PublicKey(farmInfo.lp.mintAddress)};
-    const resp = await req.connection.getParsedTokenAccountsByOwner(
+    const result = await getTokenAddressByAccount(
+      req.connection,
       wallet.publicKey,
-      filter,
-    );
-    const result = resp.value.map(
-      ({pubkey, account: {data, executable, owner, lamports}}) => ({
-        publicKey: new PublicKey(pubkey),
-        accountInfo: {
-          data,
-          executable,
-          owner: new PublicKey(owner),
-          lamports,
-        },
-      }),
+      new PublicKey(farmInfo.lp.mintAddress),
     );
     let infoAccount;
     if (!fromStakeAccount) {
@@ -261,7 +234,7 @@ const postUnStake = async (req, res) => {
       });
       if (!infoAccount) {
         const message = `RAY 스테이킹 계좌를 찾을 수 없습니다. 관리자에게 문의하세요....`;
-        return cwr.errorWebResp(res, 500, `E0000 - postUnstake`, message);
+        return cwr.errorWebResp(res, 500, `E0000 - postUnStake`, message);
       }
     } else {
       infoAccount = {publicKey: new PublicKey(fromStakeAccount)};
@@ -302,12 +275,11 @@ const postUnStake = async (req, res) => {
         amount * 10 ** farmInfo.lp.decimals,
       ),
     );
-    const signature = await sendAndConfirmTransaction(
+    const {signature, tx} = await sendAndGetTransaction(
       req.connection,
       transaction,
       signers,
     );
-    const tx = await req.connection.getTransaction(signature);
     return cwr.createWebResp(res, 200, {
       signature,
       tx,
@@ -418,69 +390,38 @@ const getPoolAccountInfo = async (req, res) => {
 
 const postAddLiquidity = async (req, res) => {
   try {
-    /*
-      //connection: Connection | undefined | null,
-      //wallet: any | undefined | null,
-      //poolInfo: LiquidityPoolInfo | undefined | null,
-      //fromCoinAccount: string | undefined | null,
-      //toCoinAccount: string | undefined | null,
-      //lpAccount: string | undefined | null,
-      fromCoin: TokenInfo | undefined | null,
-      toCoin: TokenInfo | undefined | null,
-      //fromAmount: string | undefined | null,
-      //toAmount: string | undefined | null,
-      //fixedCoin: string
-    */
-    const {
-      walletPrivateKey,
-      poolInfoName,
-      fromCoinAccount,
-      toCoinAccount,
-      lpAccount,
-      fromAmount,
-      toAmount,
-      fixedCoin,
-      fromCoinSymbol,
-      toCoinSymbol,
-    } = req.body;
-
-    const wallet = Keypair.fromSecretKey(
-      Uint8Array.from(walletPrivateKey.split(',')),
-    );
-    const poolInfo = LIQUIDITY_POOLS.find(({name}) => name === poolInfoName);
-    const fromCoin = TOKENS.find(({symbol}) => symbol === fromCoinSymbol);
-    const toCoin = TOKENS.find(({symbol}) => symbol === toCoinSymbol);
-
-    /* if (!connection || !wallet) throw new Error('Miss connection')
-    if (!poolInfo || !fromCoin || !toCoin) {
-      throw new Error('Miss pool infomations')
-    }
-    if (!fromCoinAccount || !toCoinAccount) {
-      throw new Error('Miss account infomations')
-    }
-    if (!fromAmount || !toAmount) {
-      throw new Error('Miss amount infomations')
-    } */
-
+    const {walletPrivateKey, poolInfoName, poolVersion, fixedCoin} = req.body;
+    let {fromAmount, toAmount} = req.body;
+    const wallet = restoreWallet(walletPrivateKey);
     const transaction = new Transaction();
-    const signers = [];
-
+    const signers = [wallet];
     const owner = wallet.publicKey;
-
+    const poolInfo = LIQUIDITY_POOLS.find(
+      ({name, version}) => name === poolInfoName && version === poolVersion,
+    );
+    await updateRaydiumPoolInfos(req.connection);
+    if (fromAmount) {
+      const exchangeRate = getPrice(poolInfo).toFixed(poolInfo.pc.decimals);
+      toAmount = fromAmount * exchangeRate;
+    } else if (toAmount) {
+      const exchangeRate = getPrice(poolInfo, false).toFixed(
+        poolInfo.pc.decimals,
+      );
+      fromAmount = toAmount * exchangeRate;
+    }
     const userAccounts = [
-      new PublicKey(fromCoinAccount),
-      new PublicKey(toCoinAccount),
+      await getTokenAddressByAccount(
+        req.connection,
+        owner,
+        poolInfo.coin.mintAddress,
+      ),
+      await getTokenAddressByAccount(
+        req.connection,
+        owner,
+        poolInfo.pc.mintAddress,
+      ),
     ];
     const userAmounts = [fromAmount, toAmount];
-
-    if (
-      poolInfo.coin.mintAddress === toCoin.mintAddress &&
-      poolInfo.pc.mintAddress === fromCoin.mintAddress
-    ) {
-      userAccounts.reverse();
-      userAmounts.reverse();
-    }
-
     const userCoinTokenAccount = userAccounts[0];
     const userPcTokenAccount = userAccounts[1];
     const coinAmount = getBigNumber(
@@ -489,7 +430,6 @@ const postAddLiquidity = async (req, res) => {
     const pcAmount = getBigNumber(
       new TokenAmount(userAmounts[1], poolInfo.pc.decimals, false).wei,
     );
-
     let wrappedCoinSolAccount;
     if (poolInfo.coin.mintAddress === NATIVE_SOL.mintAddress) {
       wrappedCoinSolAccount = await createTokenAccountIfNotExist(
@@ -514,16 +454,19 @@ const postAddLiquidity = async (req, res) => {
         signers,
       );
     }
-
+    const lpAccount = await getTokenAddressByAccount(
+      req.connection,
+      wallet.publicKey,
+      poolInfo.lp.mintAddress,
+    );
     const userLpTokenAccount = await createAssociatedTokenAccountIfNotExist(
-      lpAccount,
+      lpAccount.publicKey,
       owner,
       poolInfo.lp.mintAddress,
       transaction,
     );
-
     transaction.add(
-      poolInfo.version === 4
+      [4, 5].includes(poolInfo.version)
         ? addLiquidityInstructionV4(
             new PublicKey(poolInfo.programId),
             new PublicKey(poolInfo.ammId),
@@ -534,8 +477,9 @@ const postAddLiquidity = async (req, res) => {
             new PublicKey(poolInfo.poolCoinTokenAccount),
             new PublicKey(poolInfo.poolPcTokenAccount),
             new PublicKey(poolInfo.serumMarket),
-            wrappedCoinSolAccount || userCoinTokenAccount,
-            wrappedSolAccount || userPcTokenAccount,
+            wrappedCoinSolAccount ||
+              new PublicKey(userCoinTokenAccount.publicKey),
+            wrappedSolAccount || new PublicKey(userPcTokenAccount.publicKey),
             userLpTokenAccount,
             owner,
             coinAmount,
@@ -552,8 +496,9 @@ const postAddLiquidity = async (req, res) => {
             new PublicKey(poolInfo.poolCoinTokenAccount),
             new PublicKey(poolInfo.poolPcTokenAccount),
             new PublicKey(poolInfo.serumMarket),
-            wrappedCoinSolAccount || userCoinTokenAccount,
-            wrappedSolAccount || userPcTokenAccount,
+            wrappedCoinSolAccount ||
+              new PublicKey(userCoinTokenAccount.publicKey),
+            wrappedSolAccount || new PublicKey(userPcTokenAccount.publicKey),
             userLpTokenAccount,
             owner,
             coinAmount,
@@ -561,7 +506,6 @@ const postAddLiquidity = async (req, res) => {
             fixedCoin === poolInfo.coin.mintAddress ? 0 : 1,
           ),
     );
-
     if (wrappedCoinSolAccount) {
       transaction.add(
         closeAccount({
@@ -580,25 +524,167 @@ const postAddLiquidity = async (req, res) => {
         }),
       );
     }
-
-    const signature = await sendAndConfirmTransaction(
+    const {signature, tx} = await sendAndGetTransaction(
       req.connection,
       transaction,
       signers,
     );
-    const tx = await req.connection.getTransaction(signature);
     return cwr.createWebResp(res, 200, {
       signature,
       tx,
     });
   } catch (e) {
-    return cwr.errorWebResp(res, 500, `E0000 - postAddLiquidity`, e.message);
+    return cwr.errorWebResp(res, 500, `E0000 - postAddLiquidity`, e);
   }
 };
 
 const postRemoveLiquidity = async (req, res) => {
   try {
-    return cwr.createWebResp(res, 200, {});
+    const {walletPrivateKey, poolInfoName, poolVersion, amount} = req.body;
+    const transaction = new Transaction();
+    const wallet = restoreWallet(walletPrivateKey);
+    const signers = [wallet];
+    const owner = wallet.publicKey;
+    const poolInfo = LIQUIDITY_POOLS.find(
+      ({name, version}) => name === poolInfoName && version === poolVersion,
+    );
+    await updateRaydiumPoolInfos(req.connection);
+    const lpAmount = getBigNumber(
+      new TokenAmount(amount, poolInfo.lp.decimals, false).wei,
+    );
+    let needCloseFromTokenAccount = false;
+    let newFromTokenAccount;
+    const fromCoinAccount = await getTokenAddressByAccount(
+      req.connection,
+      owner,
+      poolInfo.coin.mintAddress,
+    );
+    const toCoinAccount = await getTokenAddressByAccount(
+      req.connection,
+      owner,
+      poolInfo.pc.mintAddress,
+    );
+    const lpAccount = await getTokenAddressByAccount(
+      req.connection,
+      wallet.publicKey,
+      poolInfo.lp.mintAddress,
+    );
+    if (poolInfo.coin.mintAddress === NATIVE_SOL.mintAddress) {
+      newFromTokenAccount = await createTokenAccountIfNotExist(
+        req.connection,
+        newFromTokenAccount,
+        owner,
+        TOKENS.WSOL.mintAddress,
+        null,
+        transaction,
+        signers,
+      );
+      needCloseFromTokenAccount = true;
+    } else {
+      newFromTokenAccount = await createAssociatedTokenAccountIfNotExist(
+        fromCoinAccount.publicKey,
+        owner,
+        poolInfo.coin.mintAddress,
+        transaction,
+      );
+    }
+    let needCloseToTokenAccount = false;
+    let newToTokenAccount;
+    if (poolInfo.pc.mintAddress === NATIVE_SOL.mintAddress) {
+      newToTokenAccount = await createTokenAccountIfNotExist(
+        req.connection,
+        newToTokenAccount,
+        owner,
+        TOKENS.WSOL.mintAddress,
+        null,
+        transaction,
+        signers,
+      );
+      needCloseToTokenAccount = true;
+    } else {
+      newToTokenAccount = await createAssociatedTokenAccountIfNotExist(
+        toCoinAccount.publicKey,
+        owner,
+        poolInfo.pc.mintAddress === NATIVE_SOL.mintAddress
+          ? TOKENS.WSOL.mintAddress
+          : poolInfo.pc.mintAddress,
+        transaction,
+      );
+    }
+    transaction.add(
+      [4, 5].includes(poolInfo.version)
+        ? removeLiquidityInstructionV4(
+            new PublicKey(poolInfo.programId),
+            new PublicKey(poolInfo.ammId),
+            new PublicKey(poolInfo.ammAuthority),
+            new PublicKey(poolInfo.ammOpenOrders),
+            new PublicKey(poolInfo.ammTargetOrders),
+            new PublicKey(poolInfo.lp.mintAddress),
+            new PublicKey(poolInfo.poolCoinTokenAccount),
+            new PublicKey(poolInfo.poolPcTokenAccount),
+            new PublicKey(poolInfo.poolWithdrawQueue),
+            new PublicKey(poolInfo.poolTempLpTokenAccount),
+            new PublicKey(poolInfo.serumProgramId),
+            new PublicKey(poolInfo.serumMarket),
+            new PublicKey(poolInfo.serumCoinVaultAccount),
+            new PublicKey(poolInfo.serumPcVaultAccount),
+            new PublicKey(poolInfo.serumVaultSigner),
+            new PublicKey(lpAccount.publicKey),
+            newFromTokenAccount,
+            newToTokenAccount,
+            owner,
+            lpAmount,
+          )
+        : removeLiquidityInstruction(
+            new PublicKey(poolInfo.programId),
+            new PublicKey(poolInfo.ammId),
+            new PublicKey(poolInfo.ammAuthority),
+            new PublicKey(poolInfo.ammOpenOrders),
+            new PublicKey(poolInfo.ammQuantities),
+            new PublicKey(poolInfo.lp.mintAddress),
+            new PublicKey(poolInfo.poolCoinTokenAccount),
+            new PublicKey(poolInfo.poolPcTokenAccount),
+            new PublicKey(poolInfo.poolWithdrawQueue),
+            new PublicKey(poolInfo.poolTempLpTokenAccount),
+            new PublicKey(poolInfo.serumProgramId),
+            new PublicKey(poolInfo.serumMarket),
+            new PublicKey(poolInfo.serumCoinVaultAccount),
+            new PublicKey(poolInfo.serumPcVaultAccount),
+            new PublicKey(poolInfo.serumVaultSigner),
+            new PublicKey(lpAccount.publicKey),
+            newFromTokenAccount,
+            newToTokenAccount,
+            owner,
+            lpAmount,
+          ),
+    );
+    if (needCloseFromTokenAccount) {
+      transaction.add(
+        closeAccount({
+          source: newFromTokenAccount,
+          destination: owner,
+          owner,
+        }),
+      );
+    }
+    if (needCloseToTokenAccount) {
+      transaction.add(
+        closeAccount({
+          source: newToTokenAccount,
+          destination: owner,
+          owner,
+        }),
+      );
+    }
+    const {signature, tx} = await sendAndGetTransaction(
+      req.connection,
+      transaction,
+      signers,
+    );
+    return cwr.createWebResp(res, 200, {
+      signature,
+      tx,
+    });
   } catch (e) {
     return cwr.errorWebResp(res, 500, `E0000 - postRemoveLiquidity`, e.message);
   }
@@ -606,6 +692,126 @@ const postRemoveLiquidity = async (req, res) => {
 
 const postStakePool = async (req, res) => {
   try {
+    const {walletPrivateKey, poolInfoName, poolVersion, amount} = req.body;
+    const wallet = restoreWallet(walletPrivateKey);
+    const owner = wallet.publicKey;
+    const poolInfo = LIQUIDITY_POOLS.find(
+      ({name, version}) => name === poolInfoName && version === poolVersion,
+    );
+    await updateRaydiumPoolInfos(req.connection);
+    // const conn = this.$web3
+    // const wallet = (this as any).$wallet
+
+    const lpAccount = (
+      await getTokenAddressByAccount(
+        req.connection,
+        owner,
+        poolInfo.lp.mintAddress,
+      )
+    ).publicKey;
+    const rewardAccount = (
+      await getTokenAddressByAccount(
+        req.connection,
+        owner,
+        poolInfo.coin.mintAddress,
+      )
+    ).publicKey;
+    const rewardAccountB = (
+      await getTokenAddressByAccount(
+        req.connection,
+        owner,
+        poolInfo.pc.mintAddress,
+      )
+    ).publicKey;
+    const infoAccount = undefined;
+    /*
+    const lpAccount = get(
+      this.wallet.tokenAccounts,
+      `${this.farmInfo.lp.mintAddress}.tokenAccountAddress`,
+    );
+    const rewardAccount = get(
+      this.wallet.tokenAccounts,
+      `${this.farmInfo.reward.mintAddress}.tokenAccountAddress`,
+    );
+    const rewardAccountB = get(
+      this.wallet.tokenAccounts,
+      `${this.farmInfo.rewardB?.mintAddress}.tokenAccountAddress`,
+    );
+    const infoAccount = get(
+      this.farm.stakeAccounts,
+      `${this.farmInfo.poolId}.stakeAccountAddress`,
+    );
+  */
+    const isFusion = Boolean(poolInfo.fusion);
+
+    const key = getUnixTs().toString();
+    /*
+    this.$notify.info({
+      key,
+      message: 'Making transaction...',
+      description: '',
+      duration: 0
+    })
+*/
+    const depositPromise = isFusion
+      ? await depositV4(
+          req.connection,
+          wallet,
+          this.farmInfo,
+          lpAccount,
+          rewardAccount,
+          rewardAccountB,
+          infoAccount,
+          amount,
+        )
+      : await deposit(
+          req.connection,
+          wallet,
+          this.farmInfo,
+          lpAccount,
+          rewardAccount,
+          infoAccount,
+          amount,
+        );
+
+    depositPromise.then((txid) => {
+      /*
+        this.$notify.info({
+          key,
+          message: 'Transaction has been sent',
+          description: (h /!* : any *!/) =>
+            h('div', [
+              'Confirmation is in progress.  Check your transaction on ',
+              h(
+                'a',
+                {
+                  attrs: {
+                    href: `${this.url.explorer}/tx/${txid}`,
+                    target: '_blank',
+                  },
+                },
+                'here',
+              ),
+            ]),
+        });
+        */
+      const description = `Stake ${amount} ${this.farmInfo.lp.name}`;
+      this.$accessor.transaction.sub({txid, description});
+    });
+    /*
+      .catch((error) => {
+        this.$notify.error({
+          key,
+          message: 'Stake failed',
+          description: error.message,
+        });
+      })
+      .finally(() => {
+        this.staking = false;
+        this.stakeModalOpening = false;
+      });
+      */
+
     return cwr.createWebResp(res, 200, {});
   } catch (e) {
     return cwr.errorWebResp(res, 500, `E0000 - postStakePool`, e.message);
@@ -635,4 +841,10 @@ module.exports = {
   getStakeAccount,
   getPoolInfo,
   getSearchPools,
+  getPoolAccountInfo,
+  postAddLiquidity,
+  postRemoveLiquidity,
+  postStakePool,
+  postHarvestPool,
+  postUnStakePool,
 };

@@ -1,13 +1,13 @@
 const {
   Account,
   PublicKey,
-  TransactionInstruction,
   SystemProgram,
-  SYSVAR_CLOCK_PUBKEY,
 } = require('@solana/web3.js');
 const {Token} = require('@solana/spl-token');
-const {struct, u8, nu64} = require('buffer-layout');
-const {publicKey} = require('@project-serum/borsh');
+const {
+  initializeAccount,
+} = require('@project-serum/serum/lib/token-instructions');
+const {OpenOrders} = require('@project-serum/serum');
 const {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
@@ -22,7 +22,12 @@ const {
   FARMS,
   TokenAmount,
   USER_STAKE_INFO_ACCOUNT_LAYOUT_V4,
+  AMM_INFO_LAYOUT,
+  AMM_INFO_LAYOUT_V3,
+  AMM_INFO_LAYOUT_V4,
 } = require('./raydiumStruct');
+const {ACCOUNT_LAYOUT, MINT_LAYOUT} = require('./solanaStruct');
+const {LIQUIDITY_POOLS} = require('./raydiumPools');
 
 const toSOL = (value, decimals) => {
   return value / 10 ** (decimals || 9);
@@ -36,7 +41,7 @@ const createAssociatedTokenAccountIfNotExist = async (
   owner,
   mintAddress,
   transaction,
-  atas,
+  atas = [],
 ) => {
   let publicKey;
   if (account) {
@@ -115,92 +120,6 @@ const getBigNumber = (num) => {
   return num === undefined || num === null ? 0 : parseFloat(num.toString());
 };
 
-const depositInstruction = (
-  programId,
-  poolId,
-  poolAuthority,
-  userInfoAccount,
-  userOwner,
-  userLpTokenAccount,
-  poolLpTokenAccount,
-  userRewardTokenAccount,
-  poolRewardTokenAccount,
-  amount,
-) => {
-  const dataLayout = struct([u8('instruction'), nu64('amount')]);
-
-  const keys = [
-    {pubkey: poolId, isSigner: false, isWritable: true},
-    {pubkey: poolAuthority, isSigner: false, isWritable: false},
-    {pubkey: userInfoAccount, isSigner: false, isWritable: true},
-    {pubkey: userOwner, isSigner: true, isWritable: false},
-    {pubkey: userLpTokenAccount, isSigner: false, isWritable: true},
-    {pubkey: poolLpTokenAccount, isSigner: false, isWritable: true},
-    {pubkey: userRewardTokenAccount, isSigner: false, isWritable: true},
-    {pubkey: poolRewardTokenAccount, isSigner: false, isWritable: true},
-    {pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false},
-    {pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false},
-  ];
-
-  const data = Buffer.alloc(dataLayout.span);
-  dataLayout.encode(
-    {
-      instruction: 1,
-      amount,
-    },
-    data,
-  );
-
-  return new TransactionInstruction({
-    keys,
-    programId,
-    data,
-  });
-};
-
-const withdrawInstruction = (
-  programId,
-  poolId,
-  poolAuthority,
-  userInfoAccount,
-  userOwner,
-  userLpTokenAccount,
-  poolLpTokenAccount,
-  userRewardTokenAccount,
-  poolRewardTokenAccount,
-  amount,
-) => {
-  const dataLayout = struct([u8('instruction'), nu64('amount')]);
-
-  const keys = [
-    {pubkey: poolId, isSigner: false, isWritable: true},
-    {pubkey: poolAuthority, isSigner: false, isWritable: false},
-    {pubkey: userInfoAccount, isSigner: false, isWritable: true},
-    {pubkey: userOwner, isSigner: true, isWritable: false},
-    {pubkey: userLpTokenAccount, isSigner: false, isWritable: true},
-    {pubkey: poolLpTokenAccount, isSigner: false, isWritable: true},
-    {pubkey: userRewardTokenAccount, isSigner: false, isWritable: true},
-    {pubkey: poolRewardTokenAccount, isSigner: false, isWritable: true},
-    {pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false},
-    {pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false},
-  ];
-
-  const data = Buffer.alloc(dataLayout.span);
-  dataLayout.encode(
-    {
-      instruction: 2,
-      amount,
-    },
-    data,
-  );
-
-  return new TransactionInstruction({
-    keys,
-    programId,
-    data,
-  });
-};
-
 const getMultipleAccounts = async (connection, publicKeys, commitment) => {
   const keys = [];
   let tempKeys = [];
@@ -230,6 +149,7 @@ const getMultipleAccounts = async (connection, publicKeys, commitment) => {
     .sort((a, b) => parseInt(a, 10) - parseInt(b, 10))
     .forEach((itemIndex) => {
       const res = resArray[parseInt(itemIndex, 10)];
+      // eslint-disable-next-line no-restricted-syntax
       for (const account of res) {
         accounts.push(account);
       }
@@ -240,7 +160,7 @@ const getMultipleAccounts = async (connection, publicKeys, commitment) => {
       return null;
     }
     return {
-      publicKey,
+      publicKey: publicKeys[idx],
       account,
     };
   });
@@ -278,15 +198,15 @@ const getInfoAccount = async (accountAddress, connection) => {
     encoding: 'base64',
   };
   const getProgramAccounts = await connection.getProgramAccounts(
-    new PublicKey(STAKE_PROGRAM_ID),
+    STAKE_PROGRAM_ID,
     filter,
   );
   const getProgramAccountsV4 = await connection.getProgramAccounts(
-    new PublicKey(STAKE_PROGRAM_ID_V4),
+    STAKE_PROGRAM_ID_V4,
     stakeFiltersV4,
   );
   const getProgramAccountsV5 = await connection.getProgramAccounts(
-    new PublicKey(STAKE_PROGRAM_ID_V5),
+    STAKE_PROGRAM_ID_V5,
     stakeFiltersV4,
   );
 
@@ -464,14 +384,195 @@ const getInfoAccount = async (accountAddress, connection) => {
   return {getProgramAccounts, getProgramAccountsV4, getProgramAccountsV5};
 };
 
+const createTokenAccountIfNotExist = async (
+  connection,
+  account,
+  owner,
+  mintAddress,
+  lamports,
+  transaction,
+  signer,
+) => {
+  let publicKey;
+  if (account) {
+    publicKey = new PublicKey(account);
+  } else {
+    publicKey = await createProgramAccountIfNotExist(
+      connection,
+      account,
+      owner,
+      TOKEN_PROGRAM_ID,
+      lamports,
+      ACCOUNT_LAYOUT,
+      transaction,
+      signer,
+    );
+    transaction.add(
+      initializeAccount({
+        account: publicKey,
+        mint: new PublicKey(mintAddress),
+        owner,
+      }),
+    );
+  }
+  return publicKey;
+};
+
+const getAddressForWhat = (address) => {
+  // eslint-disable-next-line no-restricted-syntax
+  for (const pool of LIQUIDITY_POOLS) {
+    // eslint-disable-next-line no-restricted-syntax
+    for (const [key, value] of Object.entries(pool)) {
+      if (key === 'lp') {
+        if (value.mintAddress === address) {
+          return {
+            key: 'lpMintAddress',
+            lpMintAddress: pool.lp.mintAddress,
+            version: pool.version,
+          };
+        }
+      } else if (value === address) {
+        return {key, lpMintAddress: pool.lp.mintAddress, version: pool.version};
+      }
+    }
+  }
+  return {};
+};
+
+const updateRaydiumPoolInfos = async (connection) => {
+  const liquidityPools = {};
+  const publicKeys = [];
+
+  LIQUIDITY_POOLS.forEach((pool) => {
+    const {
+      poolCoinTokenAccount,
+      poolPcTokenAccount,
+      ammOpenOrders,
+      ammId,
+      coin,
+      pc,
+      lp,
+    } = pool;
+
+    publicKeys.push(
+      new PublicKey(poolCoinTokenAccount),
+      new PublicKey(poolPcTokenAccount),
+      new PublicKey(ammOpenOrders),
+      new PublicKey(ammId),
+      new PublicKey(lp.mintAddress),
+    );
+
+    // const poolInfo = cloneDeep(pool);
+    const poolInfo = pool;
+
+    poolInfo.coin.balance = new TokenAmount(0, coin.decimals);
+    poolInfo.pc.balance = new TokenAmount(0, pc.decimals);
+
+    liquidityPools[lp.mintAddress] = poolInfo;
+  });
+
+  const multipleInfo = await getMultipleAccounts(
+    connection,
+    publicKeys,
+    connection.commitment,
+  );
+  multipleInfo.forEach((info) => {
+    if (info) {
+      // const address = info.publicKey.toBase58();
+      const address = info.publicKey.toString();
+      const data = Buffer.from(info.account.data);
+
+      const {key, lpMintAddress, version} = getAddressForWhat(address);
+
+      if (key && lpMintAddress) {
+        const poolInfo = liquidityPools[lpMintAddress];
+
+        // eslint-disable-next-line default-case
+        switch (key) {
+          case 'poolCoinTokenAccount': {
+            const parsed = ACCOUNT_LAYOUT.decode(data);
+            // quick fix: Number can only safely store up to 53 bits
+            poolInfo.coin.balance.wei = poolInfo.coin.balance.wei.plus(
+              getBigNumber(parsed.amount),
+            );
+            break;
+          }
+          case 'poolPcTokenAccount': {
+            const parsed = ACCOUNT_LAYOUT.decode(data);
+            poolInfo.pc.balance.wei = poolInfo.pc.balance.wei.plus(
+              getBigNumber(parsed.amount),
+            );
+            break;
+          }
+          case 'ammOpenOrders': {
+            const OPEN_ORDERS_LAYOUT = OpenOrders.getLayout(
+              new PublicKey(poolInfo.serumProgramId),
+            );
+            const parsed = OPEN_ORDERS_LAYOUT.decode(data);
+
+            const {baseTokenTotal, quoteTokenTotal} = parsed;
+            poolInfo.coin.balance.wei = poolInfo.coin.balance.wei.plus(
+              getBigNumber(baseTokenTotal),
+            );
+            poolInfo.pc.balance.wei = poolInfo.pc.balance.wei.plus(
+              getBigNumber(quoteTokenTotal),
+            );
+
+            break;
+          }
+          case 'ammId': {
+            let parsed;
+            if (version === 2) {
+              parsed = AMM_INFO_LAYOUT.decode(data);
+            } else if (version === 3) {
+              parsed = AMM_INFO_LAYOUT_V3.decode(data);
+            } else {
+              parsed = AMM_INFO_LAYOUT_V4.decode(data);
+
+              const {swapFeeNumerator, swapFeeDenominator} = parsed;
+              poolInfo.fees = {
+                swapFeeNumerator: getBigNumber(swapFeeNumerator),
+                swapFeeDenominator: getBigNumber(swapFeeDenominator),
+              };
+            }
+
+            const {status, needTakePnlCoin, needTakePnlPc} = parsed;
+            poolInfo.status = getBigNumber(status);
+            poolInfo.coin.balance.wei = poolInfo.coin.balance.wei.minus(
+              getBigNumber(needTakePnlCoin),
+            );
+            poolInfo.pc.balance.wei = poolInfo.pc.balance.wei.minus(
+              getBigNumber(needTakePnlPc),
+            );
+
+            break;
+          }
+          // getLpSupply
+          case 'lpMintAddress': {
+            const parsed = MINT_LAYOUT.decode(data);
+
+            poolInfo.lp.totalSupply = new TokenAmount(
+              getBigNumber(parsed.supply),
+              poolInfo.lp.decimals,
+            );
+
+            break;
+          }
+        }
+      }
+    }
+  });
+  return liquidityPools;
+};
+
 module.exports = {
   toSOL,
   fromSOL,
   createAssociatedTokenAccountIfNotExist,
   createProgramAccountIfNotExist,
+  createTokenAccountIfNotExist,
   getBigNumber,
-  depositInstruction,
-  withdrawInstruction,
   getMultipleAccounts,
   getInfoAccount,
+  updateRaydiumPoolInfos,
 };

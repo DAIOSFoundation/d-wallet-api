@@ -1,4 +1,8 @@
-const {TransactionInstruction} = require('@solana/web3.js');
+const {
+  TransactionInstruction,
+  Transaction,
+  PublicKey,
+} = require('@solana/web3.js');
 const {struct, u8} = require('@project-serum/borsh');
 const {nu64} = require('buffer-layout');
 const BigNumber = require('bignumber.js');
@@ -11,7 +15,24 @@ const {
   SERUM_PROGRAM_ID_V3,
   LIQUIDITY_POOL_PROGRAM_ID_V4,
 } = require('./ProgramIds');
-const {NATIVE_SOL, TOKENS, LP_TOKENS} = require('./raydiumStruct');
+const {
+  NATIVE_SOL,
+  TOKENS,
+  LP_TOKENS,
+  emergencyWithdrawInstructionV4,
+  withdrawInstructionV4,
+  TokenAmount,
+  withdrawInstruction,
+  depositInstructionV4,
+  USER_STAKE_INFO_ACCOUNT_LAYOUT_V4,
+  depositInstruction,
+  USER_STAKE_INFO_ACCOUNT_LAYOUT,
+} = require('./raydiumStruct');
+const {
+  createAssociatedTokenAccountIfNotExist,
+  createProgramAccountIfNotExist,
+  getBigNumber,
+} = require('./raydium');
 
 const LIQUIDITY_POOLS = [
   {
@@ -2650,6 +2671,436 @@ const removeLiquidityInstructionV4 = (
   });
 };
 
+const getOutAmount = (
+  poolInfo, // : LiquidityPoolInfo,
+  amount, // : string,
+  fromCoinMint, // : string,
+  toCoinMint, // : string,
+  slippage, // : number
+) => {
+  const {coin, pc} = poolInfo;
+  const price = getPrice(poolInfo);
+  const fromAmount = new BigNumber(amount);
+  let outAmount = new BigNumber(0);
+  const percent = new BigNumber(100).plus(slippage).dividedBy(100);
+  if (!coin.balance || !pc.balance) {
+    return outAmount;
+  }
+  if (fromCoinMint === coin.mintAddress && toCoinMint === pc.mintAddress) {
+    // outcoin is pc
+    outAmount = fromAmount.multipliedBy(price);
+    outAmount = outAmount.multipliedBy(percent);
+  } else if (
+    fromCoinMint === pc.mintAddress &&
+    toCoinMint === coin.mintAddress
+  ) {
+    // outcoin is coin
+    outAmount = fromAmount.dividedBy(price);
+    outAmount = outAmount.multipliedBy(percent);
+  }
+  return outAmount;
+};
+
+const getOutAmountStable = (
+  poolInfo, // : any,
+  amount, // : string,
+  fromCoinMint, // : string,
+  toCoinMint, // : string,
+  slippage, // : number
+) => {
+  const {coin, pc, currentK} = poolInfo;
+  const systemDecimal = Math.max(coin.decimals, pc.decimals);
+  const k = currentK / (10 ** systemDecimal * 10 ** systemDecimal);
+  const y = parseFloat(coin.balance.fixed());
+  const price = Math.sqrt(((10 - 1) * y * y) / (10 * y * y - k));
+  const amountIn = parseFloat(amount);
+  let amountOut = 1;
+  if (fromCoinMint === coin.mintAddress && toCoinMint === pc.mintAddress) {
+    // outcoin is pc
+    amountOut = amountIn * price;
+  } else if (
+    fromCoinMint === pc.mintAddress &&
+    toCoinMint === coin.mintAddress
+  ) {
+    // outcoin is coin
+    amountOut = amountIn / price;
+  }
+  const amountOutWithSlippage = amountOut / (1 - slippage / 100);
+  // const price = Math.sqrt((10 - 1) * y * y /(10 * y * y - k))
+  // const afterY = y - amountOut
+  // const afterPrice = Math.sqrt((10 - 1) * afterY  * afterY /(10 * afterY * afterY - k))
+  // const priceImpact = (beforePrice - afterPrice) / beforePrice * 100
+  return new BigNumber(amountOutWithSlippage);
+};
+
+// deposit
+const deposit = async (
+  connection,
+  wallet,
+  farmInfo,
+  lpAccount,
+  rewardAccount,
+  infoAccount,
+  amount,
+) => {
+  if (!connection || !wallet) throw new Error('Miss connection');
+  if (!farmInfo) throw new Error('Miss pool infomations');
+  if (!amount) throw new Error('Miss amount infomations');
+
+  const transaction = new Transaction();
+  const signers /*: any */ = [];
+
+  const owner = wallet.publicKey;
+
+  const atas /*: string[] */ = [];
+
+  const userLpAccount = await createAssociatedTokenAccountIfNotExist(
+    lpAccount,
+    owner,
+    farmInfo.lp.mintAddress,
+    transaction,
+    atas,
+  );
+
+  // if no account, create new one
+  const userRewardTokenAccount = await createAssociatedTokenAccountIfNotExist(
+    rewardAccount,
+    owner,
+    farmInfo.reward.mintAddress,
+    transaction,
+    atas,
+  );
+
+  // if no userinfo account, create new one
+  const programId = new PublicKey(farmInfo.programId);
+  const userInfoAccount = await createProgramAccountIfNotExist(
+    connection,
+    infoAccount,
+    owner,
+    programId,
+    null,
+    USER_STAKE_INFO_ACCOUNT_LAYOUT,
+    transaction,
+    signers,
+  );
+
+  const value = getBigNumber(
+    new TokenAmount(amount, farmInfo.lp.decimals, false).wei,
+  );
+
+  transaction.add(
+    depositInstruction(
+      programId,
+      new PublicKey(farmInfo.poolId),
+      new PublicKey(farmInfo.poolAuthority),
+      userInfoAccount,
+      wallet.publicKey,
+      userLpAccount,
+      new PublicKey(farmInfo.poolLpTokenAccount),
+      userRewardTokenAccount,
+      new PublicKey(farmInfo.poolRewardTokenAccount),
+      value,
+    ),
+  );
+
+  return {connection, wallet, transaction, signers};
+};
+
+// depositV4
+const depositV4 = async (
+  connection,
+  wallet,
+  farmInfo,
+  lpAccount,
+  rewardAccount,
+  rewardAccountB,
+  infoAccount,
+  amount,
+) => {
+  if (!connection || !wallet) throw new Error('Miss connection');
+  if (!farmInfo) throw new Error('Miss pool infomations');
+  if (!amount) throw new Error('Miss amount infomations');
+
+  const transaction = new Transaction();
+  const signers /*: any */ = [];
+
+  const owner = wallet.publicKey;
+
+  const atas /*: string[] */ = [];
+
+  const userLpAccount = await createAssociatedTokenAccountIfNotExist(
+    lpAccount,
+    owner,
+    farmInfo.lp.mintAddress,
+    transaction,
+    atas,
+  );
+
+  // if no account, create new one
+  const userRewardTokenAccount = await createAssociatedTokenAccountIfNotExist(
+    rewardAccount,
+    owner,
+    farmInfo.reward.mintAddress,
+    transaction,
+    atas,
+  );
+
+  // if no account, create new one
+  const userRewardTokenAccountB = await createAssociatedTokenAccountIfNotExist(
+    rewardAccountB,
+    owner,
+    // @ts-ignore
+    farmInfo.rewardB.mintAddress,
+    transaction,
+    atas,
+  );
+
+  // if no userinfo account, create new one
+  const programId = new PublicKey(farmInfo.programId);
+  const userInfoAccount = await createProgramAccountIfNotExist(
+    connection,
+    infoAccount,
+    owner,
+    programId,
+    null,
+    USER_STAKE_INFO_ACCOUNT_LAYOUT_V4,
+    transaction,
+    signers,
+  );
+
+  const value = getBigNumber(
+    new TokenAmount(amount, farmInfo.lp.decimals, false).wei,
+  );
+
+  transaction.add(
+    depositInstructionV4(
+      programId,
+      new PublicKey(farmInfo.poolId),
+      new PublicKey(farmInfo.poolAuthority),
+      userInfoAccount,
+      wallet.publicKey,
+      userLpAccount,
+      new PublicKey(farmInfo.poolLpTokenAccount),
+      userRewardTokenAccount,
+      new PublicKey(farmInfo.poolRewardTokenAccount),
+      userRewardTokenAccountB,
+      // @ts-ignore
+      new PublicKey(farmInfo.poolRewardTokenAccountB),
+      value,
+    ),
+  );
+
+  return {connection, wallet, transaction, signers};
+};
+
+// withdraw
+const withdraw = async (
+  connection,
+  wallet,
+  farmInfo,
+  lpAccount,
+  rewardAccount,
+  infoAccount,
+  amount,
+) => {
+  if (!connection || !wallet) throw new Error('Miss connection');
+  if (!farmInfo) throw new Error('Miss pool infomations');
+  if (!infoAccount) throw new Error('Miss account infomations');
+  if (!amount) throw new Error('Miss amount infomations');
+
+  const transaction = new Transaction();
+  const signers /*: any */ = [];
+
+  const owner = wallet.publicKey;
+
+  const atas /*: string[] */ = [];
+
+  const userLpAccount = await createAssociatedTokenAccountIfNotExist(
+    lpAccount,
+    owner,
+    farmInfo.lp.mintAddress,
+    transaction,
+    atas,
+  );
+
+  // if no account, create new one
+  const userRewardTokenAccount = await createAssociatedTokenAccountIfNotExist(
+    rewardAccount,
+    owner,
+    farmInfo.reward.mintAddress,
+    transaction,
+    atas,
+  );
+
+  const programId = new PublicKey(farmInfo.programId);
+  const value = getBigNumber(
+    new TokenAmount(amount, farmInfo.lp.decimals, false).wei,
+  );
+
+  transaction.add(
+    withdrawInstruction(
+      programId,
+      new PublicKey(farmInfo.poolId),
+      new PublicKey(farmInfo.poolAuthority),
+      new PublicKey(infoAccount),
+      wallet.publicKey,
+      userLpAccount,
+      new PublicKey(farmInfo.poolLpTokenAccount),
+      userRewardTokenAccount,
+      new PublicKey(farmInfo.poolRewardTokenAccount),
+      value,
+    ),
+  );
+
+  return {connection, wallet, transaction, signers};
+};
+
+// withdrawV4
+const withdrawV4 = async (
+  connection,
+  wallet,
+  farmInfo,
+  lpAccount,
+  rewardAccount,
+  rewardAccountB,
+  infoAccount,
+  amount,
+) => {
+  if (!connection || !wallet) throw new Error('Miss connection');
+  if (!farmInfo) throw new Error('Miss pool infomations');
+  if (!infoAccount) throw new Error('Miss account infomations');
+  if (!amount) throw new Error('Miss amount infomations');
+
+  const transaction = new Transaction();
+  const signers /*: any */ = [];
+
+  const owner = wallet.publicKey;
+
+  const atas /*: string[] */ = [];
+
+  const userLpAccount = await createAssociatedTokenAccountIfNotExist(
+    lpAccount,
+    owner,
+    farmInfo.lp.mintAddress,
+    transaction,
+    atas,
+  );
+  // if no account, create new one
+  const userRewardTokenAccount = await createAssociatedTokenAccountIfNotExist(
+    rewardAccount,
+    owner,
+    farmInfo.reward.mintAddress,
+    transaction,
+    atas,
+  );
+
+  // if no account, create new one
+  const userRewardTokenAccountB = await createAssociatedTokenAccountIfNotExist(
+    rewardAccountB,
+    owner,
+    // @ts-ignore
+    farmInfo.rewardB.mintAddress,
+    transaction,
+    atas,
+  );
+
+  const programId = new PublicKey(farmInfo.programId);
+  const value = getBigNumber(
+    new TokenAmount(amount, farmInfo.lp.decimals, false).wei,
+  );
+
+  transaction.add(
+    withdrawInstructionV4(
+      programId,
+      new PublicKey(farmInfo.poolId),
+      new PublicKey(farmInfo.poolAuthority),
+      new PublicKey(infoAccount),
+      wallet.publicKey,
+      userLpAccount,
+      new PublicKey(farmInfo.poolLpTokenAccount),
+      userRewardTokenAccount,
+      new PublicKey(farmInfo.poolRewardTokenAccount),
+      userRewardTokenAccountB,
+      // @ts-ignore
+      new PublicKey(farmInfo.poolRewardTokenAccountB),
+      value,
+    ),
+  );
+
+  return {connection, wallet, transaction, signers};
+};
+
+const emergencyWithdrawV4 = async (
+  connection,
+  wallet,
+  farmInfo,
+  lpAccount,
+  infoAccount,
+) => {
+  if (!connection || !wallet) throw new Error('Miss connection');
+  if (!farmInfo) throw new Error('Miss pool infomations');
+  if (!infoAccount) throw new Error('Miss account infomations');
+
+  const transaction = new Transaction();
+  const signers /*: any */ = [];
+
+  const owner = wallet.publicKey;
+
+  const atas /*: string[] */ = [];
+
+  const userLpAccount = await createAssociatedTokenAccountIfNotExist(
+    lpAccount,
+    owner,
+    farmInfo.lp.mintAddress,
+    transaction,
+    atas,
+  );
+
+  const programId = new PublicKey(farmInfo.programId);
+
+  transaction.add(
+    emergencyWithdrawInstructionV4(
+      programId,
+      new PublicKey(farmInfo.poolId),
+      new PublicKey(farmInfo.poolAuthority),
+      new PublicKey(infoAccount),
+      wallet.publicKey,
+      userLpAccount,
+      new PublicKey(farmInfo.poolLpTokenAccount),
+    ),
+  );
+
+  return {connection, wallet, transaction, signers};
+};
+
+const getFilteredProgramAccounts = async (connection, programId, filters) => {
+  // @ts-ignore
+  // eslint-disable-next-line no-underscore-dangle
+  const resp = await connection._rpcRequest('getProgramAccounts', [
+    programId.toBase58(),
+    {
+      commitment: connection.commitment,
+      filters,
+      encoding: 'base64',
+    },
+  ]);
+  if (resp.error) {
+    throw new Error(resp.error.message);
+  }
+  // @ts-ignore
+  return resp.result.map(
+    ({pubkey, account: {data, executable, owner, lamports}}) => ({
+      publicKey: new PublicKey(pubkey),
+      accountInfo: {
+        data: Buffer.from(data[0], 'base64'),
+        executable,
+        owner: new PublicKey(owner),
+        lamports,
+      },
+    }),
+  );
+};
+
 module.exports = {
   LIQUIDITY_POOLS,
   getPrice,
@@ -2657,4 +3108,12 @@ module.exports = {
   addLiquidityInstructionV4,
   removeLiquidityInstruction,
   removeLiquidityInstructionV4,
+  getOutAmount,
+  getOutAmountStable,
+  deposit,
+  depositV4,
+  withdraw,
+  withdrawV4,
+  emergencyWithdrawV4,
+  getFilteredProgramAccounts,
 };
