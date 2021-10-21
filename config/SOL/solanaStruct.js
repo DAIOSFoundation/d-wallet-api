@@ -107,36 +107,6 @@ const InstructionData = {
   'Raydium Remove Liquidity': '3yx6XPfh1jdq',
 };
 
-const getTokenAddressByAccount = async (connection, address, mint) => {
-  if (mint === NATIVE_SOL.mintAddress) {
-    return undefined;
-  }
-  const addressPublicKey = new PublicKey(address);
-  const filter = mint
-    ? {mint: new PublicKey(mint)}
-    : {programId: TOKEN_PROGRAM_ID};
-  const resp = await connection.getParsedTokenAccountsByOwner(
-    addressPublicKey,
-    filter,
-  );
-  const result = resp.value.map(
-    ({pubkey, account: {data, executable, owner, lamports}}) => ({
-      publicKey: new PublicKey(pubkey),
-      accountInfo: {
-        data,
-        executable,
-        owner: new PublicKey(owner),
-        lamports,
-      },
-    }),
-  );
-  if (result.length === 1) {
-    return result[0];
-  }
-
-  return result;
-};
-
 module.exports = {
   DERIVATION_PATH,
   PATH,
@@ -148,5 +118,4 @@ module.exports = {
   PublicKeyLayout,
   OWNER_VALIDATION_LAYOUT,
   InstructionData,
-  getTokenAddressByAccount,
 };

@@ -23,6 +23,7 @@ const {
   OWNER_VALIDATION_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
 } = require('./ProgramIds');
+const {NATIVE_SOL} = require('./raydiumStruct');
 
 const toSOL = (value, decimals) => {
   return value / 10 ** (decimals || 9);
@@ -303,6 +304,35 @@ const sendAndGetTransaction = async (connection, transaction, signers) => {
   return {signature, tx};
 };
 
+const getTokenAddressByAccount = async (connection, address, mint) => {
+  if (mint === NATIVE_SOL.mintAddress) {
+    return undefined;
+  }
+  const addressPublicKey = new PublicKey(address);
+  const filter = mint
+    ? {mint: new PublicKey(mint)}
+    : {programId: TOKEN_PROGRAM_ID};
+  const resp = await connection.getParsedTokenAccountsByOwner(
+    addressPublicKey,
+    filter,
+  );
+  const result = resp.value.map(
+    ({pubkey, account: {data, executable, owner, lamports}}) => ({
+      publicKey: new PublicKey(pubkey),
+      accountInfo: {
+        data,
+        executable,
+        owner: new PublicKey(owner),
+        lamports,
+      },
+    }),
+  );
+  if (result.length === 1) {
+    return result[0];
+  }
+  return result;
+};
+
 module.exports = {
   toSOL,
   fromSOL,
@@ -318,4 +348,5 @@ module.exports = {
   createAssociatedTokenAccountIx,
   restoreWallet,
   sendAndGetTransaction,
+  getTokenAddressByAccount,
 };

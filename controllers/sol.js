@@ -28,6 +28,7 @@ const {
   createAssociatedTokenAccountIx,
   restoreWallet,
   sendAndGetTransaction,
+  getTokenAddressByAccount,
 } = require('../config/SOL/solana');
 const {
   DERIVATION_PATH,
@@ -35,9 +36,9 @@ const {
   walletProvider,
   ACCOUNT_LAYOUT,
   MINT_LAYOUT,
-  getTokenAddressByAccount,
 } = require('../config/SOL/solanaStruct');
 const {getBigNumber} = require('../config/SOL/raydium');
+const {type} = require("mocha/lib/utils");
 
 const getBalance = async (req, res) => {
   try {
@@ -402,10 +403,11 @@ const postTokenSend = async (req, res) => {
     if (fromInfo.owner !== TOKEN_PROGRAM_ID) {
       const fromResult = await getTokenAddressByAccount(
         req.connection,
-        from,
+        from.publicKey,
         mint,
       );
-      const fromTokenInfo = await token.getAccountInfo(fromResult[0].publicKey);
+      fromToken = fromResult.publicKey;
+      const fromTokenInfo = await token.getAccountInfo(fromToken);
       const fromTokenAmount =
         getBigNumber(fromTokenInfo.amount) / 10 ** tokenInfo.decimals;
       if (fromTokenAmount < balance) {
@@ -416,8 +418,6 @@ const postTokenSend = async (req, res) => {
           'less input amount than accountBalance',
         );
       }
-
-      fromToken = fromResult[0].publicKey;
     } else {
       return cwr.errorWebResp(
         res,
@@ -429,8 +429,8 @@ const postTokenSend = async (req, res) => {
 
     if (toInfo.owner !== TOKEN_PROGRAM_ID) {
       const toResult = await getTokenAddressByAccount(req.connection, to, mint);
-      if (toResult.length === 1) {
-        toToken = toResult[0].publicKey;
+      if (toResult.publicKey) {
+        toToken = toResult.publicKey;
         transaction.add(
           transferChecked({
             source: fromToken,
