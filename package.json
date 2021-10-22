@@ -41,6 +41,7 @@
     "multer": "^1.4.3",
     "node-fetch": "^2.6.5",
     "pug": "3.0.2",
+    "raydium-ui": "^1.0.0",
     "stellar-hd-wallet": "0.0.10",
     "stellar-sdk": "^9.0.1",
     "tronweb": "^3.2.7",

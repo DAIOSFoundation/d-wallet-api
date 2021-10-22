@@ -1,5 +1,6 @@
 const {PublicKey, Transaction} = require('@solana/web3.js');
 const {closeAccount} = require('@project-serum/serum/lib/token-instructions');
+const {Float} = require('buffer-layout');
 const cwr = require('../utils/createWebResp');
 const {
   createAssociatedTokenAccountIfNotExist,
@@ -133,16 +134,21 @@ const getStakeAccount = async (req, res) => {
 
 const getPoolInfo = async (req, res) => {
   try {
+    const {isActive} = req.query;
     const raydiumPools = (await raydiumApis.getPairs()).data;
+    const raydiumPoolPrices = (await raydiumApis.getPrices()).data;
     await updateRaydiumPoolInfos(req.connection);
     await updataRaydiumFarmInfos(req.connection);
-
     const poolIdPublicKeys = FARMS.map(({poolId}) => new PublicKey(poolId));
     const multipleInfo = await getMultipleAccounts(
       req.connection,
       poolIdPublicKeys,
       req.connection.commitment,
     );
+    const pools = {
+      active: [],
+      ended: [],
+    };
     multipleInfo.forEach((info) => {
       switch (info.account.owner.toString()) {
         case STAKE_PROGRAM_ID.toString():
@@ -159,19 +165,6 @@ const getPoolInfo = async (req, res) => {
         default:
           break;
       }
-      /*
-    });
-    const poolIds = FARMS.map(({poolId}) => new PublicKey(poolId));
-    const farmsInfo = await getMultipleAccounts(
-      req.connection,
-      poolIds,
-      req.connection.commitment,
-    );
-    farmsInfo.forEach((info) => {
-      info.account.data = STAKE_INFO_LAYOUT.decode(
-        Buffer.from(info.account.data),
-      );
-      */
       info.farm = FARMS.find(
         ({poolId}) => poolId === info.publicKey.toString(),
       );
@@ -196,19 +189,28 @@ const getPoolInfo = async (req, res) => {
           getBigNumber(info.farmInfo.perBlockB),
           info.farm.rewardB.decimals,
         );
-        const rewardPerBlockAmountTotalValue =
-          getBigNumber(rewardPerBlockAmount.toEther()) * 2 * 60 * 60 * 24 * 365;
-        const rewardBPerBlockAmountTotalValue =
+        info.rewardPerBlockAmountTotalValue =
+          getBigNumber(rewardPerBlockAmount.toEther()) *
+          2 *
+          60 *
+          60 *
+          24 *
+          365 *
+          raydiumPoolPrices[info.farm.reward.symbol];
+        info.rewardBPerBlockAmountTotalValue =
           getBigNumber(rewardBPerBlockAmount.toEther()) *
           2 *
           60 *
           60 *
           24 *
-          365;
-        const liquidityCoinValue = getBigNumber(
-          info.lpPool.coin.balance.toEther(),
-        );
-        const liquidityPcValue = getBigNumber(info.lpPool.pc.balance.toEther());
+          365 *
+          raydiumPoolPrices[info.farm.rewardB.symbol];
+        const liquidityCoinValue =
+          getBigNumber(info.lpPool.coin.balance.toEther()) *
+          raydiumPoolPrices[info.farm.rewardB.symbol];
+        const liquidityPcValue =
+          getBigNumber(info.lpPool.pc.balance.toEther()) *
+          raydiumPoolPrices[info.farm.rewardB.symbol];
         const liquidityTotalValue = liquidityPcValue + liquidityCoinValue;
         const liquidityTotalSupply = getBigNumber(
           info.lpPool.lp.totalSupply.toEther(),
@@ -217,29 +219,37 @@ const getPoolInfo = async (req, res) => {
 
         const liquidityUsdValue =
           getBigNumber(info.farm.lp.balance.toEther()) * liquidityItemValue;
-        info.apr = (
-          (rewardPerBlockAmountTotalValue / liquidityUsdValue) *
+        const apr = (
+          (info.rewardPerBlockAmountTotalValue / liquidityUsdValue) *
           100
         ).toFixed(2);
-        info.aprB = (
-          (rewardBPerBlockAmountTotalValue / liquidityUsdValue) *
+        const aprB = (
+          (info.rewardBPerBlockAmountTotalValue / liquidityUsdValue) *
           100
         ).toFixed(2);
-        info.aprTotal = (
-          (rewardPerBlockAmountTotalValue / liquidityUsdValue) * 100 +
-          (rewardBPerBlockAmountTotalValue / liquidityUsdValue) * 100
-        ).toFixed(2);
-      } else if (!info.farm.fusion && info.farm.rewardB && info.lpPool) {
+
+        info.apr = getBigNumber(apr);
+        info.aprB = getBigNumber(aprB);
+        info.aprTotal = info.apr + info.aprB;
+      } else if (!info.farm.fusion && info.lpPool) {
         const rewardPerBlockAmount = new TokenAmount(
           getBigNumber(info.farmInfo.rewardPerBlock),
           info.farm.reward.decimals,
         );
-        const rewardPerBlockAmountTotalValue =
-          getBigNumber(rewardPerBlockAmount.toEther()) * 2 * 60 * 60 * 24 * 365;
-        const liquidityCoinValue = getBigNumber(
-          info.lpPool.coin.balance.toEther(),
-        );
-        const liquidityPcValue = getBigNumber(info.lpPool.pc.balance.toEther());
+        info.rewardPerBlockAmountTotalValue =
+          getBigNumber(rewardPerBlockAmount.toEther()) *
+          2 *
+          60 *
+          60 *
+          24 *
+          365 *
+          raydiumPoolPrices[info.farm.reward.symbol];
+        const liquidityCoinValue =
+          getBigNumber(info.lpPool.coin.balance.toEther()) *
+          raydiumPoolPrices[info.farm.reward.symbol];
+        const liquidityPcValue =
+          getBigNumber(info.lpPool.pc.balance.toEther()) *
+          raydiumPoolPrices[info.farm.reward.symbol];
         const liquidityTotalValue = liquidityPcValue + liquidityCoinValue;
         const liquidityTotalSupply = getBigNumber(
           info.lpPool.lp.totalSupply.toEther(),
@@ -247,28 +257,64 @@ const getPoolInfo = async (req, res) => {
         const liquidityItemValue = liquidityTotalValue / liquidityTotalSupply;
         const liquidityUsdValue =
           getBigNumber(info.farm.lp.balance.toEther()) * liquidityItemValue;
-        info.apr = (
-          (rewardPerBlockAmountTotalValue / liquidityUsdValue) *
+        const apr = (
+          (info.rewardPerBlockAmountTotalValue / liquidityUsdValue) *
           100
         ).toFixed(2);
-      } else {
-
+        info.apr = getBigNumber(apr);
       }
-
-      /*
-      info.account.data.poolLpTokenAccount =
-        info.account.data.poolLpTokenAccount.toString();
-      info.account.data.poolRewardTokenAccount =
-        info.account.data.poolRewardTokenAccount.toString();
-      info.account.data.owner = info.account.data.owner.toString();
-      info.account.data.feeOwner = info.account.data.feeOwner.toString();
-      info.account.owner = info.account.owner.toString();
-      info.farm.programId = info.farm.programId.toString();
-      info.publicKey = info.publicKey.toString();
-      */
-      // info.name = info.farm.name;
     });
-    return cwr.createWebResp(res, 200, multipleInfo);
+    multipleInfo.forEach((info) => {
+      info.publicKey = info.publicKey.toString();
+      info.name = info.farm.name;
+      info.poolVersion = info.lpPool?.version;
+      info.farmVersion = info.farm?.version;
+      info.feeApy = info.apiPool?.apy;
+      info.rewardPrice = info.farm.reward
+        ? raydiumPoolPrices[info.farm.reward.symbol]
+        : undefined;
+      info.rewardBPrice = info.farm.rewardB
+        ? raydiumPoolPrices[info.farm.rewardB.symbol]
+        : undefined;
+      info.rewardSymbol = info.farm.reward?.symbol;
+      info.rewardBSymbol = info.farm.rewardB?.symbol;
+      info.TVL = info.apiPool ? info.apiPool.liquidity : undefined;
+      info.finalAPR =
+        (info.feeApy ? info.feeApy : 0) +
+        (info.apr ? info.apr : 0) +
+        (info.aprB ? info.aprB : 0);
+      info.dualYeild = !!info.aprB;
+      info.account = undefined;
+      info.apiPool = undefined;
+      info.farmInfo = undefined;
+      if (info.farm.fusion && info.farm.rewardB && info.lpPool) {
+        info.farm = undefined;
+        info.lpPool = undefined;
+        if (
+          info.rewardPerBlockAmountTotalValue === 0 &&
+          info.rewardBPerBlockAmountTotalValue === 0
+        ) {
+          info.rewardPerBlockAmountTotalValue = undefined;
+          info.rewardBPerBlockAmountTotalValue = undefined;
+          pools.ended.push(info);
+        } else {
+          info.rewardPerBlockAmountTotalValue = undefined;
+          info.rewardBPerBlockAmountTotalValue = undefined;
+          pools.active.push(info);
+        }
+      } else if (!info.farm.fusion && info.lpPool) {
+        info.farm = undefined;
+        info.lpPool = undefined;
+        if (info.rewardPerBlockAmountTotalValue === 0) {
+          info.rewardPerBlockAmountTotalValue = undefined;
+          pools.ended.push(info);
+        } else {
+          info.rewardPerBlockAmountTotalValue = undefined;
+          pools.active.push(info);
+        }
+      }
+    });
+    return cwr.createWebResp(res, 200, pools[isActive]);
   } catch (e) {
     return cwr.errorWebResp(res, 500, `E0000 - getPoolInfo`, e.message);
   }
@@ -316,8 +362,9 @@ const getPoolAccountInfo = async (req, res) => {
 
 const postAddLiquidity = async (req, res) => {
   try {
-    const {walletPrivateKey, poolInfoName, poolVersion, fixedCoin} = req.body;
+    const {walletPrivateKey, poolInfoName, poolVersion} = req.body;
     let {fromAmount, toAmount} = req.body;
+    let fixedCoin;
     const wallet = restoreWallet(walletPrivateKey);
     const transaction = new Transaction();
     const signers = [wallet];
@@ -329,11 +376,34 @@ const postAddLiquidity = async (req, res) => {
     if (fromAmount) {
       const exchangeRate = getPrice(poolInfo).toFixed(poolInfo.pc.decimals);
       toAmount = fromAmount * exchangeRate;
+      const tokenAccount = await getTokenAddressByAccount(
+        req.connection,
+        owner,
+        poolInfo.pc.mintAddress,
+      );
+      if (
+        tokenAccount?.accountInfo?.data?.parsed?.info?.tokenAmount?.uiAmount <
+        toAmount
+      ) {
+        throw `existBalance(${tokenAccount?.accountInfo?.data?.parsed?.info?.tokenAmount?.uiAmount.toString()}) < toAmount(${toAmount})`;
+      }
     } else if (toAmount) {
       const exchangeRate = getPrice(poolInfo, false).toFixed(
         poolInfo.pc.decimals,
       );
       fromAmount = toAmount * exchangeRate;
+      fixedCoin = poolInfo.coin.mintAddress;
+      const tokenAccount = await getTokenAddressByAccount(
+        req.connection,
+        owner,
+        poolInfo.coin.mintAddress,
+      );
+      if (
+        tokenAccount?.accountInfo?.data?.parsed?.info?.tokenAmount?.uiAmount <
+        fromAmount
+      ) {
+        throw `existBalance(${tokenAccount?.accountInfo?.data?.parsed?.info?.tokenAmount?.uiAmount.toString()}) < fromAmount(${fromAmount})`;
+      }
     }
     const userAccounts = [
       await getTokenAddressByAccount(
@@ -691,6 +761,15 @@ const postUnStakePool = async (req, res) => {
     });
   } catch (e) {
     return cwr.errorWebResp(res, 500, `E0000 - postUnStakePool`, e.message);
+  }
+};
+
+const getPairAmountFromFarm = async (req, res) => {
+  try {
+    const {walletPrivateKey, poolInfoName, poolVersion, amount} = req.body;
+    return cwr.createWebResp(res, 200);
+  } catch (e) {
+    return cwr.errorWebResp(res, 500, `E0000 - getPairAmountFromFarm`, e.message);
   }
 };
 

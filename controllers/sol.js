@@ -37,8 +37,7 @@ const {
   ACCOUNT_LAYOUT,
   MINT_LAYOUT,
 } = require('../config/SOL/solanaStruct');
-const {getBigNumber} = require('../config/SOL/raydium');
-const {type} = require("mocha/lib/utils");
+const {getBigNumber, createProgramAccountIfNotExist} = require('../config/SOL/raydium');
 
 const getBalance = async (req, res) => {
   try {
@@ -54,12 +53,11 @@ const getBalance = async (req, res) => {
 const getTokenBalance = async (req, res) => {
   try {
     const {address, mint} = req.query;
-    const result = await getTokenAddressByAccount(
-      req.connection,
-      address,
-      mint,
-    );
+    let result = await getTokenAddressByAccount(req.connection, address, mint);
     let tokens = [];
+    if (!result.length) {
+      result = [result];
+    }
     const envEndpoint = {
       devnet: splTokenRegistry.ENV.Devnet,
       testnet: splTokenRegistry.ENV.Testnet,

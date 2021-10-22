@@ -1,8 +1,8 @@
 const {
-  Account,
   PublicKey,
   SystemProgram,
   Transaction,
+  Keypair,
 } = require('@solana/web3.js');
 const {Token} = require('@solana/spl-token');
 const {
@@ -37,9 +37,11 @@ const {
   LIQUIDITY_POOLS,
   NATIVE_SOL,
   TOKENS,
-  STAKE_INFO_LAYOUT_V4, RAYDIUM_MINT_LAYOUT, RAYDIUM_ACCOUNT_LAYOUT,
+  STAKE_INFO_LAYOUT_V4,
+  RAYDIUM_MINT_LAYOUT,
+  RAYDIUM_ACCOUNT_LAYOUT,
 } = require('./raydiumStruct');
-const {ACCOUNT_LAYOUT, MINT_LAYOUT} = require('./solanaStruct');
+const {ACCOUNT_LAYOUT} = require('./solanaStruct');
 const {getTokenAddressByAccount} = require('./solana');
 const {
   addLiquidityInstructionV4,
@@ -135,13 +137,11 @@ const createProgramAccountIfNotExist = async (
   signer,
 ) => {
   let publicKey;
-
   if (account) {
     publicKey = new PublicKey(account);
   } else {
-    const newAccount = new Account();
+    const newAccount = new Keypair();
     publicKey = newAccount.publicKey;
-
     transaction.add(
       SystemProgram.createAccount({
         fromPubkey: owner,
@@ -153,10 +153,8 @@ const createProgramAccountIfNotExist = async (
         programId,
       }),
     );
-
     signer.push(newAccount);
   }
-
   return publicKey;
 };
 
@@ -295,7 +293,7 @@ const getInfoAccount = async (accountAddress, connection) => {
         break;
     }
   });
-  const dev = true;
+  const dev = false;
 
   resResult.forEach((item) => {
     switch (item.account.owner.toString()) {
@@ -329,6 +327,8 @@ const getInfoAccount = async (accountAddress, connection) => {
           item.decimals,
         ).toEther();
         item.depositBalance = item.account.data.depositBalance.toEther();
+        item.farmVersion = item.farm.version;
+        item.poolVersion = LIQUIDITY_POOLS.find(({lp}) => lp.mintAddress === item.farm.lp.mintAddress)?.version;
         if (!dev) {
           item.pubkey = undefined;
           item.farm = undefined;
@@ -357,6 +357,8 @@ const getInfoAccount = async (accountAddress, connection) => {
           item.decimals,
         );
         item.depositBalance = item.account.data.depositBalance.toEther();
+        item.farmVersion = item.farm.version;
+        item.poolVersion = LIQUIDITY_POOLS.find(({lp}) => lp.mintAddress === item.farm.lp.mintAddress)?.version;
         if (item.farm.fusion) {
           item.pendingReward = new TokenAmount(
             item.account.data.depositBalance.wei
@@ -430,7 +432,29 @@ const createTokenAccountIfNotExist = async (
   return publicKey;
 };
 
-const getAddressForWhat = (address) => {
+const getAddressForWhatIOnFarm = (address) => {
+  // dont use forEach
+  for (const farm of FARMS) {
+    for (const [key, value] of Object.entries(farm)) {
+      // if (key === 'lp') {
+      //   if (value.mintAddress === address) {
+      //     return { key: 'poolId', poolId: farm.poolId }
+      //   }
+      // } else if (key === 'reward') {
+      //   if (value.mintAddress === address) {
+      //     return { key: 'rewardMintAddress', poolId: farm.poolId }
+      //   }
+      // } else
+
+      if (value === address) {
+        return {key, poolId: farm.poolId};
+      }
+    }
+  }
+  return {};
+};
+
+const getAddressForWhatOnPool = (address) => {
   // eslint-disable-next-line no-restricted-syntax
   for (const pool of LIQUIDITY_POOLS) {
     // eslint-disable-next-line no-restricted-syntax
@@ -486,7 +510,7 @@ const updateRaydiumPoolInfos = async (connection) => {
       const address = info.publicKey.toString();
       const data = Buffer.from(info.account.data);
 
-      const {key, lpMintAddress, version} = getAddressForWhat(address);
+      const {key, lpMintAddress, version} = getAddressForWhatOnPool(address);
 
       if (key && lpMintAddress) {
         const poolInfo = liquidityPools[lpMintAddress];
@@ -586,7 +610,7 @@ const updataRaydiumFarmInfos = async (connection) => {
     if (info) {
       const address = info.publicKey.toBase58();
       const data = Buffer.from(info.account.data);
-      const {key, poolId} = getAddressForWhat(address);
+      const {key, poolId} = getAddressForWhatIOnFarm(address);
       if (key && poolId) {
         const farmInfo = farms[poolId];
         switch (key) {
@@ -621,6 +645,7 @@ const deposit = async (
   connection,
   wallet,
   farmInfo,
+  poolInfo,
   lpAccount,
   rewardAccount,
   infoAccount,
@@ -653,9 +678,9 @@ const deposit = async (
     transaction,
     atas,
   );
-
   // if no userinfo account, create new one
   const programId = new PublicKey(farmInfo.programId);
+  /*
   const userInfoAccount = await createProgramAccountIfNotExist(
     connection,
     infoAccount,
@@ -666,11 +691,33 @@ const deposit = async (
     transaction,
     signers,
   );
+  */
+  let userInfoAccount;
+  if (!infoAccount) {
+    const newAccount = new Keypair();
+    userInfoAccount = newAccount.publicKey;
+    transaction.add(
+      SystemProgram.createAccount({
+        fromPubkey: owner,
+        newAccountPubkey: newAccount.publicKey,
+        lamports: await connection.getMinimumBalanceForRentExemption(
+          USER_STAKE_INFO_ACCOUNT_LAYOUT.span,
+        ),
+        space: USER_STAKE_INFO_ACCOUNT_LAYOUT.span,
+        programId: farmInfo.programId,
+      }),
+    );
+    signers.push(newAccount);
+    console.log("newAccount pub", newAccount.publicKey.toString());
+    console.log("newAccount priv", newAccount.secretKey.toString());
+  } else {
+    userInfoAccount = infoAccount;
+  }
+  return {connection, wallet, transaction, signers};
 
   const value = getBigNumber(
     new TokenAmount(amount, farmInfo.lp.decimals, false).wei,
   );
-
   transaction.add(
     depositInstruction(
       programId,
@@ -685,7 +732,6 @@ const deposit = async (
       value,
     ),
   );
-
   return {connection, wallet, transaction, signers};
 };
 
@@ -980,7 +1026,7 @@ const stakeAndHarvestAndUnStake = async (
       infoAccount = infoAccounts.find(
         (item) => item.poolId === farmInfo.poolId,
       );
-      depositBalance = infoAccount.depositBalance;
+      depositBalance = infoAccount?.depositBalance;
       lpAccount = await getTokenAddressByAccount(
         connection,
         owner,
@@ -1002,18 +1048,18 @@ const stakeAndHarvestAndUnStake = async (
       lpAccount = await getTokenAddressByAccount(
         connection,
         owner,
-        poolInfo.lp.mintAddress,
+        farmInfo.lp.mintAddress,
       );
       rewardAccount = await getTokenAddressByAccount(
         connection,
         owner,
-        poolInfo.coin.mintAddress,
+        farmInfo.reward.mintAddress,
       );
       rewardAccountB = farmInfo.fusion
         ? await getTokenAddressByAccount(
             connection,
             owner,
-            poolInfo.pc.mintAddress,
+            farmInfo.rewardB.mintAddress,
           )
         : undefined;
       infoAccounts = await getInfoAccount(owner, connection);
@@ -1023,10 +1069,10 @@ const stakeAndHarvestAndUnStake = async (
       accountInfo = await getInfoAccount(owner, connection);
       depositBalance = accountInfo.find(
         ({poolId}) => poolId === farmInfo.poolId,
-      ).depositBalance;
+      )?.depositBalance;
       break;
     default:
-      throw '변수 초기화 에러.';
+      throw new Error('변수 초기화 에러.');
   }
 
   switch (isStake) {
@@ -1036,9 +1082,9 @@ const stakeAndHarvestAndUnStake = async (
         connection,
         wallet,
         farmInfo,
-        lpAccount.publicKey,
-        rewardAccount.publicKey,
-        new PublicKey(infoAccount.publicKey),
+        lpAccount?.publicKey,
+        rewardAccount?.publicKey,
+        infoAccount?.publicKey,
         stakeFunctions.RAY.stake ? amount : '0',
       );
       break;
@@ -1047,9 +1093,9 @@ const stakeAndHarvestAndUnStake = async (
         connection,
         wallet,
         farmInfo,
-        lpAccount.publicKey,
-        rewardAccount.publicKey,
-        new PublicKey(infoAccount.publicKey),
+        lpAccount?.publicKey,
+        rewardAccount?.publicKey,
+        infoAccount?.publicKey,
         depositBalance < amount ? depositBalance : amount,
       );
       break;
@@ -1060,19 +1106,20 @@ const stakeAndHarvestAndUnStake = async (
             connection,
             wallet,
             farmInfo,
-            lpAccount.publicKey,
-            rewardAccount.publicKey,
-            rewardAccountB.publicKey,
-            new PublicKey(infoAccount.publicKey),
+            lpAccount?.publicKey,
+            rewardAccount?.publicKey,
+            rewardAccountB?.publicKey,
+            infoAccount?.publicKey,
             stakeFunctions.POOL.stake ? amount : '0',
           )
         : await deposit(
             connection,
             wallet,
             farmInfo,
-            lpAccount.publicKey,
-            rewardAccount.publicKey,
-            new PublicKey(infoAccount.publicKey),
+            poolInfo,
+            lpAccount?.publicKey,
+            rewardAccount?.publicKey,
+            infoAccount?.publicKey,
             stakeFunctions.POOL.stake ? amount : '0',
           );
       break;
@@ -1082,19 +1129,19 @@ const stakeAndHarvestAndUnStake = async (
             connection,
             wallet,
             farmInfo,
-            lpAccount.publicKey,
-            rewardAccount.publicKey,
-            rewardAccountB.publicKey,
-            new PublicKey(infoAccount.publicKey),
+            lpAccount?.publicKey,
+            rewardAccount?.publicKey,
+            rewardAccountB?.publicKey,
+            infoAccount?.publicKey,
             depositBalance < amount ? depositBalance : amount,
           )
         : await withdraw(
             connection,
             wallet,
             farmInfo,
-            lpAccount.publicKey,
-            rewardAccount.publicKey,
-            new PublicKey(infoAccount.publicKey),
+            lpAccount?.publicKey,
+            rewardAccount?.publicKey,
+            infoAccount?.publicKey,
             depositBalance < amount ? depositBalance : amount,
           );
       break;
