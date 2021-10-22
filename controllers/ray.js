@@ -769,7 +769,12 @@ const getPairAmountFromFarm = async (req, res) => {
     const {walletPrivateKey, poolInfoName, poolVersion, amount} = req.body;
     return cwr.createWebResp(res, 200);
   } catch (e) {
-    return cwr.errorWebResp(res, 500, `E0000 - getPairAmountFromFarm`, e.message);
+    return cwr.errorWebResp(
+      res,
+      500,
+      `E0000 - getPairAmountFromFarm`,
+      e.message,
+    );
   }
 };
 

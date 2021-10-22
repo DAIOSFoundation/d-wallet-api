@@ -37,7 +37,10 @@ const {
   ACCOUNT_LAYOUT,
   MINT_LAYOUT,
 } = require('../config/SOL/solanaStruct');
-const {getBigNumber, createProgramAccountIfNotExist} = require('../config/SOL/raydium');
+const {
+  getBigNumber,
+  createProgramAccountIfNotExist,
+} = require('../config/SOL/raydium');
 
 const getBalance = async (req, res) => {
   try {

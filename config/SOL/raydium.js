@@ -328,7 +328,9 @@ const getInfoAccount = async (accountAddress, connection) => {
         ).toEther();
         item.depositBalance = item.account.data.depositBalance.toEther();
         item.farmVersion = item.farm.version;
-        item.poolVersion = LIQUIDITY_POOLS.find(({lp}) => lp.mintAddress === item.farm.lp.mintAddress)?.version;
+        item.poolVersion = LIQUIDITY_POOLS.find(
+          ({lp}) => lp.mintAddress === item.farm.lp.mintAddress,
+        )?.version;
         if (!dev) {
           item.pubkey = undefined;
           item.farm = undefined;
@@ -358,7 +360,9 @@ const getInfoAccount = async (accountAddress, connection) => {
         );
         item.depositBalance = item.account.data.depositBalance.toEther();
         item.farmVersion = item.farm.version;
-        item.poolVersion = LIQUIDITY_POOLS.find(({lp}) => lp.mintAddress === item.farm.lp.mintAddress)?.version;
+        item.poolVersion = LIQUIDITY_POOLS.find(
+          ({lp}) => lp.mintAddress === item.farm.lp.mintAddress,
+        )?.version;
         if (item.farm.fusion) {
           item.pendingReward = new TokenAmount(
             item.account.data.depositBalance.wei
@@ -708,8 +712,8 @@ const deposit = async (
       }),
     );
     signers.push(newAccount);
-    console.log("newAccount pub", newAccount.publicKey.toString());
-    console.log("newAccount priv", newAccount.secretKey.toString());
+    console.log('newAccount pub', newAccount.publicKey.toString());
+    console.log('newAccount priv', newAccount.secretKey.toString());
   } else {
     userInfoAccount = infoAccount;
   }
