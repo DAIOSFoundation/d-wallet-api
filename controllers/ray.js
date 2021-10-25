@@ -9,9 +9,10 @@ const {
   getBigNumber,
   createTokenAccountIfNotExist,
   updateRaydiumPoolInfos,
-  stakeAndHarvestAndUnStake,
   raydiumApis,
   updataRaydiumFarmInfos,
+  stakeAndHarvestAndUnStake,
+  addAndRemoveLiquidity,
 } = require('../config/SOL/raydium');
 const {
   FARMS,
@@ -24,13 +25,7 @@ const {
   LIQUIDITY_POOLS,
   STAKE_INFO_LAYOUT_V4,
 } = require('../config/SOL/raydiumStruct');
-const {
-  getPrice,
-  addLiquidityInstruction,
-  addLiquidityInstructionV4,
-  removeLiquidityInstruction,
-  removeLiquidityInstructionV4,
-} = require('../config/SOL/raydiumPools');
+const {getPrice} = require('../config/SOL/raydiumPools');
 const {
   restoreWallet,
   sendAndGetTransaction,
@@ -362,164 +357,20 @@ const getPoolAccountInfo = async (req, res) => {
 
 const postAddLiquidity = async (req, res) => {
   try {
-    const {walletPrivateKey, poolInfoName, poolVersion} = req.body;
-    let {fromAmount, toAmount} = req.body;
-    let fixedCoin;
+    const {walletPrivateKey, poolInfoName, poolVersion, fromAmount, toAmount} =
+      req.body;
     const wallet = restoreWallet(walletPrivateKey);
-    const transaction = new Transaction();
-    const signers = [wallet];
-    const owner = wallet.publicKey;
-    const poolInfo = LIQUIDITY_POOLS.find(
-      ({name, version}) => name === poolInfoName && version === poolVersion,
-    );
-    await updateRaydiumPoolInfos(req.connection);
-    if (fromAmount) {
-      const exchangeRate = getPrice(poolInfo).toFixed(poolInfo.pc.decimals);
-      toAmount = fromAmount * exchangeRate;
-      const tokenAccount = await getTokenAddressByAccount(
-        req.connection,
-        owner,
-        poolInfo.pc.mintAddress,
-      );
-      if (
-        tokenAccount?.accountInfo?.data?.parsed?.info?.tokenAmount?.uiAmount <
-        toAmount
-      ) {
-        throw `existBalance(${tokenAccount?.accountInfo?.data?.parsed?.info?.tokenAmount?.uiAmount.toString()}) < toAmount(${toAmount})`;
-      }
-    } else if (toAmount) {
-      const exchangeRate = getPrice(poolInfo, false).toFixed(
-        poolInfo.pc.decimals,
-      );
-      fromAmount = toAmount * exchangeRate;
-      fixedCoin = poolInfo.coin.mintAddress;
-      const tokenAccount = await getTokenAddressByAccount(
-        req.connection,
-        owner,
-        poolInfo.coin.mintAddress,
-      );
-      if (
-        tokenAccount?.accountInfo?.data?.parsed?.info?.tokenAmount?.uiAmount <
-        fromAmount
-      ) {
-        throw `existBalance(${tokenAccount?.accountInfo?.data?.parsed?.info?.tokenAmount?.uiAmount.toString()}) < fromAmount(${fromAmount})`;
-      }
-    }
-    const userAccounts = [
-      await getTokenAddressByAccount(
-        req.connection,
-        owner,
-        poolInfo.coin.mintAddress,
-      ),
-      await getTokenAddressByAccount(
-        req.connection,
-        owner,
-        poolInfo.pc.mintAddress,
-      ),
-    ];
-    const userAmounts = [fromAmount, toAmount];
-    const userCoinTokenAccount = userAccounts[0];
-    const userPcTokenAccount = userAccounts[1];
-    const coinAmount = getBigNumber(
-      new TokenAmount(userAmounts[0], poolInfo.coin.decimals, false).wei,
-    );
-    const pcAmount = getBigNumber(
-      new TokenAmount(userAmounts[1], poolInfo.pc.decimals, false).wei,
-    );
-    let wrappedCoinSolAccount;
-    if (poolInfo.coin.mintAddress === NATIVE_SOL.mintAddress) {
-      wrappedCoinSolAccount = await createTokenAccountIfNotExist(
-        req.connection,
-        wrappedCoinSolAccount,
-        owner,
-        TOKENS.WSOL.mintAddress,
-        coinAmount + 1e7,
-        transaction,
-        signers,
-      );
-    }
-    let wrappedSolAccount;
-    if (poolInfo.pc.mintAddress === NATIVE_SOL.mintAddress) {
-      wrappedSolAccount = await createTokenAccountIfNotExist(
-        req.connection,
-        wrappedSolAccount,
-        owner,
-        TOKENS.WSOL.mintAddress,
-        pcAmount + 1e7,
-        transaction,
-        signers,
-      );
-    }
-    const lpAccount = await getTokenAddressByAccount(
+
+    const {transaction, signers} = await addAndRemoveLiquidity(
       req.connection,
-      wallet.publicKey,
-      poolInfo.lp.mintAddress,
+      stakeFunctions.POOL.addLP,
+      wallet,
+      poolInfoName,
+      poolVersion,
+      fromAmount,
+      toAmount,
     );
-    const userLpTokenAccount = await createAssociatedTokenAccountIfNotExist(
-      lpAccount.publicKey,
-      owner,
-      poolInfo.lp.mintAddress,
-      transaction,
-    );
-    transaction.add(
-      [4, 5].includes(poolInfo.version)
-        ? addLiquidityInstructionV4(
-            new PublicKey(poolInfo.programId),
-            new PublicKey(poolInfo.ammId),
-            new PublicKey(poolInfo.ammAuthority),
-            new PublicKey(poolInfo.ammOpenOrders),
-            new PublicKey(poolInfo.ammTargetOrders),
-            new PublicKey(poolInfo.lp.mintAddress),
-            new PublicKey(poolInfo.poolCoinTokenAccount),
-            new PublicKey(poolInfo.poolPcTokenAccount),
-            new PublicKey(poolInfo.serumMarket),
-            wrappedCoinSolAccount ||
-              new PublicKey(userCoinTokenAccount.publicKey),
-            wrappedSolAccount || new PublicKey(userPcTokenAccount.publicKey),
-            userLpTokenAccount,
-            owner,
-            coinAmount,
-            pcAmount,
-            fixedCoin === poolInfo.coin.mintAddress ? 0 : 1,
-          )
-        : addLiquidityInstruction(
-            new PublicKey(poolInfo.programId),
-            new PublicKey(poolInfo.ammId),
-            new PublicKey(poolInfo.ammAuthority),
-            new PublicKey(poolInfo.ammOpenOrders),
-            new PublicKey(poolInfo.ammQuantities),
-            new PublicKey(poolInfo.lp.mintAddress),
-            new PublicKey(poolInfo.poolCoinTokenAccount),
-            new PublicKey(poolInfo.poolPcTokenAccount),
-            new PublicKey(poolInfo.serumMarket),
-            wrappedCoinSolAccount ||
-              new PublicKey(userCoinTokenAccount.publicKey),
-            wrappedSolAccount || new PublicKey(userPcTokenAccount.publicKey),
-            userLpTokenAccount,
-            owner,
-            coinAmount,
-            pcAmount,
-            fixedCoin === poolInfo.coin.mintAddress ? 0 : 1,
-          ),
-    );
-    if (wrappedCoinSolAccount) {
-      transaction.add(
-        closeAccount({
-          source: wrappedCoinSolAccount,
-          destination: owner,
-          owner,
-        }),
-      );
-    }
-    if (wrappedSolAccount) {
-      transaction.add(
-        closeAccount({
-          source: wrappedSolAccount,
-          destination: owner,
-          owner,
-        }),
-      );
-    }
+
     const {signature, tx} = await sendAndGetTransaction(
       req.connection,
       transaction,
@@ -537,141 +388,18 @@ const postAddLiquidity = async (req, res) => {
 const postRemoveLiquidity = async (req, res) => {
   try {
     const {walletPrivateKey, poolInfoName, poolVersion, amount} = req.body;
-    const transaction = new Transaction();
     const wallet = restoreWallet(walletPrivateKey);
-    const signers = [wallet];
-    const owner = wallet.publicKey;
-    const poolInfo = LIQUIDITY_POOLS.find(
-      ({name, version}) => name === poolInfoName && version === poolVersion,
-    );
-    await updateRaydiumPoolInfos(req.connection);
-    const lpAmount = getBigNumber(
-      new TokenAmount(amount, poolInfo.lp.decimals, false).wei,
-    );
-    let needCloseFromTokenAccount = false;
-    let newFromTokenAccount;
-    const fromCoinAccount = await getTokenAddressByAccount(
+
+    const {transaction, signers} = await addAndRemoveLiquidity(
       req.connection,
-      owner,
-      poolInfo.coin.mintAddress,
+      stakeFunctions.POOL.removeLP,
+      wallet,
+      poolInfoName,
+      poolVersion,
+      amount,
+      (toBalance = 0),
     );
-    const toCoinAccount = await getTokenAddressByAccount(
-      req.connection,
-      owner,
-      poolInfo.pc.mintAddress,
-    );
-    const lpAccount = await getTokenAddressByAccount(
-      req.connection,
-      wallet.publicKey,
-      poolInfo.lp.mintAddress,
-    );
-    if (poolInfo.coin.mintAddress === NATIVE_SOL.mintAddress) {
-      newFromTokenAccount = await createTokenAccountIfNotExist(
-        req.connection,
-        newFromTokenAccount,
-        owner,
-        TOKENS.WSOL.mintAddress,
-        null,
-        transaction,
-        signers,
-      );
-      needCloseFromTokenAccount = true;
-    } else {
-      newFromTokenAccount = await createAssociatedTokenAccountIfNotExist(
-        fromCoinAccount.publicKey,
-        owner,
-        poolInfo.coin.mintAddress,
-        transaction,
-      );
-    }
-    let needCloseToTokenAccount = false;
-    let newToTokenAccount;
-    if (poolInfo.pc.mintAddress === NATIVE_SOL.mintAddress) {
-      newToTokenAccount = await createTokenAccountIfNotExist(
-        req.connection,
-        newToTokenAccount,
-        owner,
-        TOKENS.WSOL.mintAddress,
-        null,
-        transaction,
-        signers,
-      );
-      needCloseToTokenAccount = true;
-    } else {
-      newToTokenAccount = await createAssociatedTokenAccountIfNotExist(
-        toCoinAccount.publicKey,
-        owner,
-        poolInfo.pc.mintAddress === NATIVE_SOL.mintAddress
-          ? TOKENS.WSOL.mintAddress
-          : poolInfo.pc.mintAddress,
-        transaction,
-      );
-    }
-    transaction.add(
-      [4, 5].includes(poolInfo.version)
-        ? removeLiquidityInstructionV4(
-            new PublicKey(poolInfo.programId),
-            new PublicKey(poolInfo.ammId),
-            new PublicKey(poolInfo.ammAuthority),
-            new PublicKey(poolInfo.ammOpenOrders),
-            new PublicKey(poolInfo.ammTargetOrders),
-            new PublicKey(poolInfo.lp.mintAddress),
-            new PublicKey(poolInfo.poolCoinTokenAccount),
-            new PublicKey(poolInfo.poolPcTokenAccount),
-            new PublicKey(poolInfo.poolWithdrawQueue),
-            new PublicKey(poolInfo.poolTempLpTokenAccount),
-            new PublicKey(poolInfo.serumProgramId),
-            new PublicKey(poolInfo.serumMarket),
-            new PublicKey(poolInfo.serumCoinVaultAccount),
-            new PublicKey(poolInfo.serumPcVaultAccount),
-            new PublicKey(poolInfo.serumVaultSigner),
-            new PublicKey(lpAccount.publicKey),
-            newFromTokenAccount,
-            newToTokenAccount,
-            owner,
-            lpAmount,
-          )
-        : removeLiquidityInstruction(
-            new PublicKey(poolInfo.programId),
-            new PublicKey(poolInfo.ammId),
-            new PublicKey(poolInfo.ammAuthority),
-            new PublicKey(poolInfo.ammOpenOrders),
-            new PublicKey(poolInfo.ammQuantities),
-            new PublicKey(poolInfo.lp.mintAddress),
-            new PublicKey(poolInfo.poolCoinTokenAccount),
-            new PublicKey(poolInfo.poolPcTokenAccount),
-            new PublicKey(poolInfo.poolWithdrawQueue),
-            new PublicKey(poolInfo.poolTempLpTokenAccount),
-            new PublicKey(poolInfo.serumProgramId),
-            new PublicKey(poolInfo.serumMarket),
-            new PublicKey(poolInfo.serumCoinVaultAccount),
-            new PublicKey(poolInfo.serumPcVaultAccount),
-            new PublicKey(poolInfo.serumVaultSigner),
-            new PublicKey(lpAccount.publicKey),
-            newFromTokenAccount,
-            newToTokenAccount,
-            owner,
-            lpAmount,
-          ),
-    );
-    if (needCloseFromTokenAccount) {
-      transaction.add(
-        closeAccount({
-          source: newFromTokenAccount,
-          destination: owner,
-          owner,
-        }),
-      );
-    }
-    if (needCloseToTokenAccount) {
-      transaction.add(
-        closeAccount({
-          source: newToTokenAccount,
-          destination: owner,
-          owner,
-        }),
-      );
-    }
+
     const {signature, tx} = await sendAndGetTransaction(
       req.connection,
       transaction,

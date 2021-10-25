@@ -1,11 +1,13 @@
-const {struct, blob, nu64} = require('buffer-layout');
+const {struct, blob, nu64, seq} = require('buffer-layout');
 const {publicKey, u64, u128, u8, u32, bool} = require('@project-serum/borsh');
 const BigNumber = require('bignumber.js');
 const {
   SYSVAR_CLOCK_PUBKEY,
   TransactionInstruction,
+  SYSVAR_RENT_PUBKEY,
 } = require('@solana/web3.js');
 const {
+  SYSTEM_PROGRAM_ID,
   STAKE_PROGRAM_ID,
   STAKE_PROGRAM_ID_V4,
   STAKE_PROGRAM_ID_V5,
@@ -126,6 +128,16 @@ const USER_STAKE_INFO_ACCOUNT_LAYOUT_V4 = struct([
   u64('depositBalance'),
   u64('rewardDebt'),
   u64('rewardDebtB'),
+]);
+
+const USER_STAKE_INFO_ACCOUNT_LAYOUT_V5 = struct([
+  u64('state'),
+  publicKey('poolId'),
+  publicKey('stakerOwner'),
+  u64('depositBalance'),
+  u128('rewardDebt'),
+  u128('rewardDebtB'),
+  seq(u64(), 17),
 ]);
 
 const NATIVE_SOL = {
@@ -4872,6 +4884,39 @@ const RAYDIUM_MINT_LAYOUT = struct([
   publicKey('freezeAuthority'),
 ]);
 
+const createAssociatedLedgerAccountInstructionV5 = (
+  programId,
+  // staking pool
+  poolId,
+  // user
+  associatedLedgerAccount,
+  userOwner,
+) => {
+  const dataLayout = struct([u8('instruction')]);
+
+  const keys = [
+    {pubkey: poolId, isSigner: false, isWritable: true},
+    {pubkey: associatedLedgerAccount, isSigner: false, isWritable: true},
+    {pubkey: userOwner, isSigner: true, isWritable: false},
+    {pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false},
+    {pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false},
+  ];
+
+  const data = Buffer.alloc(dataLayout.span);
+  dataLayout.encode(
+    {
+      instruction: 10,
+    },
+    data,
+  );
+
+  return new TransactionInstruction({
+    keys,
+    programId,
+    data,
+  });
+};
+
 const depositInstruction = (
   programId,
   poolId,
@@ -4929,7 +4974,7 @@ const depositInstructionV4 = (
   poolRewardTokenAccount,
   userRewardTokenAccountB,
   poolRewardTokenAccountB,
-  // tokenProgramId: PublicKey,
+  // tokenProgramId,
   amount,
 ) => {
   const dataLayout = struct([u8('instruction'), nu64('amount')]);
@@ -4953,6 +4998,58 @@ const depositInstructionV4 = (
   dataLayout.encode(
     {
       instruction: 1,
+      amount,
+    },
+    data,
+  );
+
+  return new TransactionInstruction({
+    keys,
+    programId,
+    data,
+  });
+};
+
+const depositInstructionV5 = (
+  programId,
+  poolId,
+  poolAuthority,
+  userAssociatedInfoAccount,
+  userInfoAccounts,
+  userOwner,
+  userLpTokenAccount,
+  poolLpTokenAccount,
+  userRewardTokenAccount,
+  poolRewardTokenAccount,
+  userRewardTokenAccountB,
+  poolRewardTokenAccountB,
+  amount,
+) => {
+  const dataLayout = struct([u8('instruction'), nu64('amount')]);
+
+  const keys = [
+    {pubkey: poolId, isSigner: false, isWritable: true},
+    {pubkey: poolAuthority, isSigner: false, isWritable: false},
+    {pubkey: userAssociatedInfoAccount, isSigner: false, isWritable: true},
+    {pubkey: userOwner, isSigner: true, isWritable: false},
+    {pubkey: userLpTokenAccount, isSigner: false, isWritable: true},
+    {pubkey: poolLpTokenAccount, isSigner: false, isWritable: true},
+    {pubkey: userRewardTokenAccount, isSigner: false, isWritable: true},
+    {pubkey: poolRewardTokenAccount, isSigner: false, isWritable: true},
+    {pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false},
+    {pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false},
+    {pubkey: userRewardTokenAccountB, isSigner: false, isWritable: true},
+    {pubkey: poolRewardTokenAccountB, isSigner: false, isWritable: true},
+  ];
+
+  for (const userInfoAccount of userInfoAccounts) {
+    keys.push({pubkey: userInfoAccount, isSigner: false, isWritable: true});
+  }
+
+  const data = Buffer.alloc(dataLayout.span);
+  dataLayout.encode(
+    {
+      instruction: 11,
       amount,
     },
     data,
@@ -5022,7 +5119,7 @@ const withdrawInstructionV4 = (
   poolRewardTokenAccount,
   userRewardTokenAccountB,
   poolRewardTokenAccountB,
-  // tokenProgramId: PublicKey,
+  // tokenProgramId,
   amount,
 ) => {
   const dataLayout = struct([u8('instruction'), nu64('amount')]);
@@ -5046,6 +5143,61 @@ const withdrawInstructionV4 = (
   dataLayout.encode(
     {
       instruction: 2,
+      amount,
+    },
+    data,
+  );
+
+  return new TransactionInstruction({
+    keys,
+    programId,
+    data,
+  });
+};
+
+const withdrawInstructionV5 = (
+  programId,
+  // staking pool
+  poolId,
+  poolAuthority,
+  // user
+  userAssociatedInfoAccount,
+  userInfoAccounts,
+  userOwner,
+  userLpTokenAccount,
+  poolLpTokenAccount,
+  userRewardTokenAccount,
+  poolRewardTokenAccount,
+  userRewardTokenAccountB,
+  poolRewardTokenAccountB,
+  // tokenProgramId,
+  amount,
+) => {
+  const dataLayout = struct([u8('instruction'), nu64('amount')]);
+
+  const keys = [
+    {pubkey: poolId, isSigner: false, isWritable: true},
+    {pubkey: poolAuthority, isSigner: false, isWritable: false},
+    {pubkey: userAssociatedInfoAccount, isSigner: false, isWritable: true},
+    {pubkey: userOwner, isSigner: true, isWritable: false},
+    {pubkey: userLpTokenAccount, isSigner: false, isWritable: true},
+    {pubkey: poolLpTokenAccount, isSigner: false, isWritable: true},
+    {pubkey: userRewardTokenAccount, isSigner: false, isWritable: true},
+    {pubkey: poolRewardTokenAccount, isSigner: false, isWritable: true},
+    {pubkey: SYSVAR_CLOCK_PUBKEY, isSigner: false, isWritable: false},
+    {pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false},
+    {pubkey: userRewardTokenAccountB, isSigner: false, isWritable: true},
+    {pubkey: poolRewardTokenAccountB, isSigner: false, isWritable: true},
+  ];
+
+  for (const userInfoAccount of userInfoAccounts) {
+    keys.push({pubkey: userInfoAccount, isSigner: false, isWritable: true});
+  }
+
+  const data = Buffer.alloc(dataLayout.span);
+  dataLayout.encode(
+    {
+      instruction: 12,
       amount,
     },
     data,
@@ -5097,9 +5249,10 @@ const emergencyWithdrawInstructionV4 = (
 module.exports = {
   stakeFunctions,
   STAKE_INFO_LAYOUT,
-  USER_STAKE_INFO_ACCOUNT_LAYOUT,
   STAKE_INFO_LAYOUT_V4,
+  USER_STAKE_INFO_ACCOUNT_LAYOUT,
   USER_STAKE_INFO_ACCOUNT_LAYOUT_V4,
+  USER_STAKE_INFO_ACCOUNT_LAYOUT_V5,
   STAKE_PROGRAM_ID,
   STAKE_PROGRAM_ID_V4,
   STAKE_PROGRAM_ID_V5,
@@ -5117,7 +5270,10 @@ module.exports = {
   RAYDIUM_MINT_LAYOUT,
   depositInstruction,
   depositInstructionV4,
+  depositInstructionV5,
   withdrawInstruction,
   withdrawInstructionV4,
+  withdrawInstructionV5,
   emergencyWithdrawInstructionV4,
+  createAssociatedLedgerAccountInstructionV5,
 };

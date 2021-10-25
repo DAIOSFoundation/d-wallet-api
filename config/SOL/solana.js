@@ -333,6 +333,22 @@ const getTokenAddressByAccount = async (connection, address, mint) => {
   return result;
 };
 
+const findAssociatedStakeInfoAddress = async (
+  poolId,
+  walletAddress,
+  programId,
+) => {
+  const [publicKey, nonce] = await PublicKey.findProgramAddress(
+    [
+      poolId.toBuffer(),
+      walletAddress.toBuffer(),
+      Buffer.from('staker_info_v2_associated_seed'),
+    ],
+    programId,
+  );
+  return publicKey;
+};
+
 module.exports = {
   toSOL,
   fromSOL,
@@ -349,4 +365,5 @@ module.exports = {
   restoreWallet,
   sendAndGetTransaction,
   getTokenAddressByAccount,
+  findAssociatedStakeInfoAddress,
 };
