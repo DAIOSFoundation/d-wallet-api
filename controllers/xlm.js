@@ -757,13 +757,18 @@ const getMinimumBalance = async (req, res) => {
     const balance = accountDetail.balances;
     const minimumBalance =
       (2 + subEntryCount + numSponsoring - numSponsored) * 0.5;
-    const expression = `(2 + subEntryCount + numSponsoring - numSponsored) * 0.5`;
+    const nativeBalance = balance.find(
+      (item) => item.asset_type === 'native',
+    ).balance;
+    const availableBalance = nativeBalance - minimumBalance;
+    const expression = `(2 + subEntryCount + numSponsoring - numSponsored) * 0.5 = minimumBalance`;
     return cwr.createWebResp(res, 200, {
-      minimumBalance,
+      minimumBalance: minimumBalance.toString(),
       subEntryCount,
       numSponsoring,
       numSponsored,
       expression,
+      availableBalance: availableBalance.toString(),
       balance,
     });
   } catch (e) {
