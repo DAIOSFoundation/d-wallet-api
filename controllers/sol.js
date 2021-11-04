@@ -86,6 +86,9 @@ const getTokenBalance = async (req, res) => {
         program: result[i].accountInfo.data.program,
         tokenName: tokenInfo?.name,
         tokenSymbol: tokenInfo?.symbol,
+        logoURI: tokenInfo?.logoURI,
+        chainId: tokenInfo?.chainId,
+        extensions: tokenInfo?.extensions,
       };
       tokens.push(token);
     }
