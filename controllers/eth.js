@@ -69,7 +69,16 @@ const getEtherBalance = async (req, res) => {
     const {walletAddress} = req.query;
     let balance = await req.web3.eth.getBalance(walletAddress);
     balance = req.web3.utils.fromWei(balance, 'ether');
-    return cwr.createWebResp(res, 200, {balance});
+    const code = await req.web3.eth.getCode(walletAddress);
+
+    // EOA or CA ?
+    let type;
+    if (code !== '0x') {
+      type = 'CA';
+    } else {
+      type = 'EOA';
+    }
+    return cwr.createWebResp(res, 200, {type, balance});
   } catch (e) {
     return cwr.errorWebResp(
       res,
