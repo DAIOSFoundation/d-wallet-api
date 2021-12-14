@@ -3,12 +3,10 @@ const StellarHDWallet = require('stellar-hd-wallet');
 const Web3 = require('web3');
 const Client = require('bitcoin-core');
 const TronWeb = require('tronweb');
-const ethers = require('ethers');
 const {create, globSource} = require('ipfs-http-client');
 const multer = require('multer');
 const solanaWeb3 = require('@solana/web3.js');
 const winston = require('winston');
-const axios = require('axios');
 const cwr = require('../utils/createWebResp');
 const stellarConfig = require('../config/XLM/stellar');
 const eth = require('../config/ETH/eth');
@@ -314,7 +312,6 @@ const tronSendRawTransaction = async (req, res) => {
 /// /////////////////// Middleware for IPFS //////////////////////
 const ipfsNetwork = async (req, res, next) => {
   try {
-    const {network} = req.body;
     req.ipfs = create(process.env.NODE_ENDPOINT);
     req.globSource = globSource;
     req.tmpDirectory = process.env.FILE_TEMP_DIRECTORY;
@@ -357,20 +354,6 @@ const multerInitialize = async (req, res, next) => {
 };
 
 const upload = multer({storage});
-
-const getPriceFromWeb = async (req, res) => {
-  try {
-    const {market} = req.query;
-    const upbitURL = `https://api.upbit.com/v1/ticker?markets=${market}`;
-    const upbitResponse = await axios.get(upbitURL);
-
-    return cwr.createWebResp(res, 200, {
-      upbitResponse,
-    });
-  } catch (e) {
-    return cwr.errorWebResp(res, 500, `E0000 - getPriceFromWeb`, e.message);
-  }
-};
 
 module.exports = {
   isValidMnemonic,

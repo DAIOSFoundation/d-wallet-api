@@ -10,7 +10,7 @@
   "dependencies": {
     "@aave/protocol-js": "^3.1.0",
     "@project-serum/borsh": "^0.2.2",
-    "@project-serum/serum": "^0.13.60",
+    "@project-serum/serum": "^0.13.61",
     "@solana/spl-token": "^0.1.8",
     "@solana/spl-token-registry": "^0.2.286",
     "@solana/web3.js": "^1.30.2",
@@ -39,7 +39,7 @@
     "keythereum": "^1.2.0",
     "mongoose": "^5.13.8",
     "morgan": "~1.10.0",
-    "multer": "^1.4.3",
+    "multer": "^1.4.4",
     "node-fetch": "^2.6.5",
     "pug": "3.0.2",
     "raydium-ui": "^1.0.0",
